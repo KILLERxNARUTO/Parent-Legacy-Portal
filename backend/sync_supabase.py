@@ -14,10 +14,7 @@ if str(ROOT) not in sys.path:
 if str(ROOT / 'backend') not in sys.path:
     sys.path.insert(0, str(ROOT / 'backend'))
 
-try:
-    from backend import supabase_client
-except ImportError:
-    import supabase_client
+from backend import supabase_client
 
 
 def main():

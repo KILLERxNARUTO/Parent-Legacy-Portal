@@ -14,10 +14,7 @@ if str(ROOT) not in sys.path:
 if str(ROOT / 'backend') not in sys.path:
     sys.path.insert(0, str(ROOT / 'backend'))
 
-try:
-    from backend import main, auth
-except ImportError:
-    import main, auth
+from backend import main, auth
 
 
 def add_user(username, name, password, role, children=()):

@@ -89,32 +89,40 @@ def main():
     roster = {student['id']: student for student in api('/students')}
     for demo in DEMO_STUDENTS:
         student = {key: demo[key] for key in ('id', 'name', 'age', 'world_tier', 'target_sessions')}
-        sid = student['id']
+        sid = str(student['id'])
         if sid in roster:
             if roster[sid] != student:
                 raise SystemExit(f'{sid} already belongs to a different record; no changes made to it.')
         else:
             api('/students', student)
         saved = {log['id'] for log in api(f'/students/{sid}/logs')['logs']}
-        for index, (title, activity, scores) in enumerate(demo['projects']):
+        projects = list(demo['projects'])
+        notes = str(demo['notes'])
+        plan = str(demo['plan'])
+        breakthrough = str(demo['breakthrough'])
+        support = str(demo['support'])
+        hours = float(demo['hours'])
+        zone = str(demo['zone'])
+        sdgs = list(demo['sdgs'])
+        for index, (title, activity, scores) in enumerate(projects):
             session_id = str(uuid5(NAMESPACE_URL, f'edutainal-demo-v1/{sid}/{index}'))
             if session_id in saved:
                 continue
             api('/sessions', {
                 'id': session_id,
                 'student_id': sid,
-                'observed_on': (date.today() - timedelta(days=(len(demo['projects']) - index) * 7)).isoformat(),
-                'zone_name': demo['zone'],
+                'observed_on': (date.today() - timedelta(days=(len(projects) - index) * 7)).isoformat(),
+                'zone_name': zone,
                 'project_title': f'[Sample] {title}',
                 'signature_experience': activity,
                 'steamre_rubric': scores,
-                'mentor_notes': 'Fictional demonstration data. ' + demo['notes'],
-                'action_plan': demo['plan'],
-                'breakthrough_note': demo['breakthrough'],
-                'friction_note': demo['support'],
-                'session_hours': demo['hours'],
+                'mentor_notes': f'Fictional demonstration data. {notes}',
+                'action_plan': plan,
+                'breakthrough_note': breakthrough,
+                'friction_note': support,
+                'session_hours': hours,
                 'behavioral_scores': {'curiosity': 3, 'autonomy': 2 if index < 2 else 3, 'collaboration': 3},
-                'sdgs': demo['sdgs'],
+                'sdgs': sdgs,
             })
         report = api(f'/students/{sid}/analytics')
         print(f"{student['name']}: {report['total_sessions']} sessions, {report['total_hours']} hours, {len(report['pathways'])} pathways")

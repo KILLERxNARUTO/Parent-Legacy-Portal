@@ -31,10 +31,7 @@ from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, Stre
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-try:
-    from backend import auth, supabase_client
-except ImportError:
-    import auth, supabase_client
+from backend import auth, supabase_client
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = os.environ.get('PORTAL_DB', str(ROOT / 'backend' / 'portal-secure.sqlite3'))
@@ -416,6 +413,8 @@ def login(payload: Login, request: Request, response: Response):
     username = payload.username.strip().lower()
     address = request.client.host if request.client else 'unknown'
     failure = False
+    token = ''
+    expected_role = 'observer' if payload.portal == 'company' else 'parent'
     with database() as db:
         db.execute('DELETE FROM login_attempts WHERE attempted_at<?', (time.time()-900,))
         count = db.execute('SELECT COUNT(*) FROM login_attempts WHERE address=? AND username=?', (address, username)).fetchone()[0]
@@ -428,7 +427,6 @@ def login(payload: Login, request: Request, response: Response):
         elif not user:
             user = db.execute("SELECT * FROM users WHERE username LIKE ?", (username + '@%',)).fetchone()
         valid = auth.verify_password(payload.password, user['password_hash'] if user else auth.DUMMY_PASSWORD)
-        expected_role = 'observer' if payload.portal == 'company' else 'parent'
         if not valid or not user or not user['active'] or user['role'] != expected_role:
             db.execute('INSERT INTO login_attempts VALUES (?,?,?)', (username, address, time.time()))
             failure = True
@@ -591,21 +589,21 @@ def analytics(student, logs):
                        'effective_samples': round(weight ** 2 / sum(w*w for v,w,d in samples), 1) if weight else 0,
                        'spread': round((sum(w*(v-mean)**2 for v,w,d in samples)/weight)**0.5, 1) if weight else None,
                        'last_observed': samples[-1][2] if samples else None})
-    covered = sum(s['observations'] >= 3 for s in skills)
+    covered = sum(int(s['observations'] or 0) >= 3 for s in skills)
     pathways = []
     for title, indexes, activity in PATHWAYS:
-        if all(skills[i]['observations'] >= 3 for i in indexes):
-            pathways.append({'title': title, 'alignment': round(sum(skills[i]['score'] for i in indexes)/len(indexes), 1),
+        if all(int(skills[i]['observations'] or 0) >= 3 for i in indexes):
+            pathways.append({'title': title, 'alignment': round(sum(float(skills[i]['score'] or 0.0) for i in indexes)/len(indexes), 1),
                              'basis': [PILLARS[i] for i in indexes], 'activity': activity})
-    pathways.sort(key=lambda p: (-p['alignment'], p['title']))
+    pathways.sort(key=lambda p: (-float(p['alignment']), str(p['title'])))
     missing = [s['name'] for s in skills if not s['observations']]
     measured = [s for s in skills if s['score'] is not None]
-    focus = min(measured, key=lambda s: s['score']) if measured else None
+    focus = min(measured, key=lambda s: float(s['score'] if s['score'] is not None else 0.0)) if measured else None
     actions = []
     if logs:
         actions.append(logs[-1]['action_plan'])
     if missing:
-        actions.append('Plan an activity to observe: ' + ', '.join(missing) + '.')
+        actions.append('Plan an activity to observe: ' + ', '.join(str(m) for m in missing) + '.')
     if focus:
         actions.append(f"Practice {focus['name']} with mentor support and collect another observation.")
     return {'student': student, 'total_sessions': len(logs),
