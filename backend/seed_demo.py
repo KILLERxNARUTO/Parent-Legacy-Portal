@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import NAMESPACE_URL, uuid5
+from typing import Any
 
 BACKEND_BASE = os.environ.get('BACKEND_URL', 'http://127.0.0.1:8000').rstrip('/')
 BASE_URL = f'{BACKEND_BASE}/api/v1'
@@ -28,7 +29,7 @@ def api(path, payload=None):
         raise RuntimeError(f'{path}: {error.code} {error.read().decode()}') from error
 
 
-DEMO_STUDENTS = [
+DEMO_STUDENTS: list[dict[str, Any]] = [
     {
         'id': 'demo-aarav', 'name': 'Aarav Sharma (Sample)', 'age': 12,
         'world_tier': 'hyper', 'target_sessions': 24,
@@ -96,15 +97,19 @@ def main():
         else:
             api('/students', student)
         saved = {log['id'] for log in api(f'/students/{sid}/logs')['logs']}
-        projects = list(demo['projects'])
-        notes = str(demo['notes'])
-        plan = str(demo['plan'])
-        breakthrough = str(demo['breakthrough'])
-        support = str(demo['support'])
-        hours = float(demo['hours'])
-        zone = str(demo['zone'])
-        sdgs = list(demo['sdgs'])
-        for index, (title, activity, scores) in enumerate(projects):
+        raw_projects = demo.get('projects')
+        projects = raw_projects if isinstance(raw_projects, list) else []
+        notes = str(demo.get('notes', ''))
+        plan = str(demo.get('plan', ''))
+        breakthrough = str(demo.get('breakthrough', ''))
+        support = str(demo.get('support', ''))
+        raw_hours = demo.get('hours', 0.0)
+        hours = float(raw_hours) if isinstance(raw_hours, (int, float)) else 0.0
+        zone = str(demo.get('zone', ''))
+        raw_sdgs = demo.get('sdgs')
+        sdgs = raw_sdgs if isinstance(raw_sdgs, list) else []
+        for index, item in enumerate(projects):
+            title, activity, scores = item
             session_id = str(uuid5(NAMESPACE_URL, f'edutainal-demo-v1/{sid}/{index}'))
             if session_id in saved:
                 continue

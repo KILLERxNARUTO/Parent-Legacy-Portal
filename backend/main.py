@@ -595,7 +595,7 @@ def analytics(student, logs):
         if all(int(skills[i]['observations'] or 0) >= 3 for i in indexes):
             pathways.append({'title': title, 'alignment': round(sum(float(skills[i]['score'] or 0.0) for i in indexes)/len(indexes), 1),
                              'basis': [PILLARS[i] for i in indexes], 'activity': activity})
-    pathways.sort(key=lambda p: (-float(p['alignment']), str(p['title'])))
+    pathways.sort(key=lambda p: (-(p['alignment'] if isinstance(p['alignment'], (int, float)) else 0.0), str(p['title'])))
     missing = [s['name'] for s in skills if not s['observations']]
     measured = [s for s in skills if s['score'] is not None]
     focus = min(measured, key=lambda s: float(s['score'] if s['score'] is not None else 0.0)) if measured else None

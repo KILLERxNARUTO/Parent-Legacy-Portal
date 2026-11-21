@@ -45,7 +45,7 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
 SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY', '').strip()
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '').strip()
 
-_client = None
+_client: Any = None
 
 
 def is_configured() -> bool:
@@ -53,7 +53,7 @@ def is_configured() -> bool:
     return bool(SUPABASE_URL and (SUPABASE_KEY or SUPABASE_ANON_KEY))
 
 
-def get_client():
+def get_client() -> Any:
     """Get or create singleton Supabase client using dynamic import."""
     global _client
     if _client is not None:
