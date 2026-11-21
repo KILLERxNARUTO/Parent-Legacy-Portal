@@ -9,10 +9,34 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / '.env')
+
+# Safe .env loader (with built-in fallback parser if python-dotenv is not installed)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / '.env')
+except ImportError:
+    pass
+
+def _load_env_fallback():
+    env_file = ROOT / '.env'
+    if not env_file.exists():
+        return
+    try:
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k not in os.environ:
+                        os.environ[k] = v
+    except Exception:
+        pass
+
+_load_env_fallback()
 
 SQLITE_DB = ROOT / 'backend' / 'portal-secure.sqlite3'
 
@@ -30,7 +54,7 @@ def is_configured() -> bool:
 
 
 def get_client():
-    """Get or create singleton Supabase client."""
+    """Get or create singleton Supabase client using dynamic import."""
     global _client
     if _client is not None:
         return _client
@@ -39,13 +63,41 @@ def get_client():
         return None
 
     try:
-        from supabase import create_client, ClientOptions
+        import supabase  # type: ignore
         key = SUPABASE_KEY or SUPABASE_ANON_KEY
-        _client = create_client(SUPABASE_URL, key)
-        return _client
+        create_fn = getattr(supabase, 'create_client', None)
+        if callable(create_fn):
+            _client = create_fn(SUPABASE_URL, key)
+            return _client
     except Exception as e:
-        print(f"[Supabase] Initialization warning: {e}")
-        return None
+        print(f"[Supabase] SDK initialization notice: {e}")
+    return None
+
+
+def _rest_request(endpoint: str, method: str = 'GET', data: Optional[Any] = None, params: Optional[Dict[str, str]] = None) -> Any:
+    """Zero-dependency HTTP fallback using standard httpx for robust REST operations."""
+    import httpx
+    key = SUPABASE_KEY or SUPABASE_ANON_KEY
+    headers = {
+        'apikey': key,
+        'Authorization': f'Bearer {key}',
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=representation'
+    }
+    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/{endpoint}"
+    with httpx.Client(timeout=10.0) as client:
+        if method == 'GET':
+            resp = client.get(url, headers=headers, params=params)
+        elif method == 'POST':
+            resp = client.post(url, headers=headers, json=data)
+        elif method == 'DELETE':
+            resp = client.delete(url, headers=headers, params=params)
+        elif method == 'PATCH':
+            resp = client.patch(url, headers=headers, json=data, params=params)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+        resp.raise_for_status()
+        return resp.json() if resp.text else None
 
 
 def test_connection() -> Dict[str, Any]:
@@ -55,18 +107,29 @@ def test_connection() -> Dict[str, Any]:
             "status": "unconfigured",
             "message": "SUPABASE_URL and SUPABASE_KEY are not set in environment or .env"
         }
+    
+    # Try SDK first
     client = get_client()
-    if not client:
-        return {
-            "status": "error",
-            "message": "Failed to create Supabase client instance"
-        }
+    if client:
+        try:
+            res = client.table("students").select("id").limit(1).execute()
+            return {
+                "status": "connected",
+                "driver": "supabase-py",
+                "url": SUPABASE_URL,
+                "data": res.data
+            }
+        except Exception as e:
+            pass
+            
+    # Try direct HTTP REST fallback
     try:
-        res = client.table("students").select("id").limit(1).execute()
+        data = _rest_request("students?select=id&limit=1")
         return {
             "status": "connected",
+            "driver": "rest-api",
             "url": SUPABASE_URL,
-            "data": res.data
+            "data": data
         }
     except Exception as e:
         return {
@@ -78,9 +141,8 @@ def test_connection() -> Dict[str, Any]:
 
 def push_sqlite_to_supabase(sqlite_path: Optional[str] = None) -> Dict[str, Any]:
     """Migrate and sync all SQLite records directly into Supabase tables."""
-    client = get_client()
-    if not client:
-        raise RuntimeError("Supabase client is not configured or reachable")
+    if not is_configured():
+        raise RuntimeError("Supabase client is not configured")
 
     db_file = sqlite_path or str(SQLITE_DB)
     con = sqlite3.connect(db_file)
@@ -97,120 +159,135 @@ def push_sqlite_to_supabase(sqlite_path: Optional[str] = None) -> Dict[str, Any]
     students_rows = cur.execute("SELECT id, data FROM students").fetchall()
     for sid, data_str in students_rows:
         data = json.loads(data_str) if isinstance(data_str, str) else data_str
-        client.table("students").upsert({"id": sid, "data": data}).execute()
+        sync_student(sid, data)
         stats["students"] += 1
 
     # 2. Sync Observations
     obs_rows = cur.execute("SELECT id, student_id, observed_on, created_at, data FROM observations").fetchall()
     for oid, sid, observed_on, created_at, data_str in obs_rows:
         data = json.loads(data_str) if isinstance(data_str, str) else data_str
-        client.table("observations").upsert({
-            "id": oid,
-            "student_id": sid,
-            "observed_on": observed_on,
-            "created_at": created_at,
-            "data": data
-        }).execute()
+        sync_observation(oid, sid, observed_on, created_at, data)
         stats["observations"] += 1
 
     # 3. Sync Users
     user_rows = cur.execute("SELECT id, username, name, password_hash, role, active FROM users").fetchall()
     for uid, username, name, pwhash, role, active in user_rows:
-        client.table("users").upsert({
-            "id": uid,
-            "username": username,
-            "name": name,
-            "password_hash": pwhash,
-            "role": role,
-            "active": bool(active)
-        }).execute()
+        sync_user(uid, username, name, pwhash, role, bool(active))
         stats["users"] += 1
 
     # 4. Sync Parent-Children
     pc_rows = cur.execute("SELECT user_id, student_id FROM parent_children").fetchall()
+    grouped: Dict[str, List[str]] = {}
     for uid, sid in pc_rows:
-        client.table("parent_children").upsert({
-            "user_id": uid,
-            "student_id": sid
-        }).execute()
-        stats["parent_children"] += 1
+        grouped.setdefault(uid, []).append(sid)
+    for uid, sids in grouped.items():
+        sync_parent_children(uid, sids)
+        stats["parent_children"] += len(sids)
 
     con.close()
     return stats
 
 
 def sync_observation(obs_id: str, student_id: str, observed_on: str, created_at: str, data: dict):
-    """Background helper to sync an individual observation to Supabase if configured."""
-    client = get_client()
-    if not client:
+    """Sync an individual observation to Supabase synchronously."""
+    if not is_configured():
         return
+    payload = {
+        "id": obs_id,
+        "student_id": student_id,
+        "observed_on": observed_on,
+        "created_at": created_at,
+        "data": data
+    }
+    client = get_client()
+    if client:
+        try:
+            client.table("observations").upsert(payload).execute()
+            return
+        except Exception as e:
+            print(f"[Supabase Sync] SDK notice: {e}")
     try:
-        client.table("observations").upsert({
-            "id": obs_id,
-            "student_id": student_id,
-            "observed_on": observed_on,
-            "created_at": created_at,
-            "data": data
-        }).execute()
+        _rest_request("observations", method='POST', data=payload)
     except Exception as e:
         print(f"[Supabase Sync] Warning: Failed to sync observation {obs_id}: {e}")
 
 
 def sync_student(student_id: str, data: dict):
     """Sync an individual student to Supabase synchronously."""
-    client = get_client()
-    if not client:
+    if not is_configured():
         return
+    payload = {"id": student_id, "data": data}
+    client = get_client()
+    if client:
+        try:
+            client.table("students").upsert(payload).execute()
+            return
+        except Exception as e:
+            print(f"[Supabase Sync] SDK notice: {e}")
     try:
-        client.table("students").upsert({
-            "id": student_id,
-            "data": data
-        }).execute()
+        _rest_request("students", method='POST', data=payload)
     except Exception as e:
         print(f"[Supabase Sync] Warning: Failed to sync student {student_id}: {e}")
 
 
 def sync_user(user_id: str, username: str, name: str, password_hash: str, role: str, active: bool = True):
     """Sync an individual user account to Supabase synchronously."""
-    client = get_client()
-    if not client:
+    if not is_configured():
         return
+    payload = {
+        "id": user_id,
+        "username": username,
+        "name": name,
+        "password_hash": password_hash,
+        "role": role,
+        "active": active
+    }
+    client = get_client()
+    if client:
+        try:
+            client.table("users").upsert(payload).execute()
+            return
+        except Exception as e:
+            print(f"[Supabase Sync] SDK notice: {e}")
     try:
-        client.table("users").upsert({
-            "id": user_id,
-            "username": username,
-            "name": name,
-            "password_hash": password_hash,
-            "role": role,
-            "active": active
-        }).execute()
+        _rest_request("users", method='POST', data=payload)
     except Exception as e:
         print(f"[Supabase Sync] Warning: Failed to sync user {username}: {e}")
 
 
 def sync_parent_children(user_id: str, student_ids: List[str]):
     """Sync parent-child relationships to Supabase synchronously."""
-    client = get_client()
-    if not client:
+    if not is_configured():
         return
+    client = get_client()
+    if client:
+        try:
+            client.table("parent_children").delete().eq("user_id", user_id).execute()
+            for sid in student_ids:
+                client.table("parent_children").upsert({"user_id": user_id, "student_id": sid}).execute()
+            return
+        except Exception as e:
+            print(f"[Supabase Sync] SDK notice: {e}")
     try:
-        client.table("parent_children").delete().eq("user_id", user_id).execute()
+        _rest_request(f"parent_children?user_id=eq.{user_id}", method='DELETE')
         for sid in student_ids:
-            client.table("parent_children").upsert({
-                "user_id": user_id,
-                "student_id": sid
-            }).execute()
+            _rest_request("parent_children", method='POST', data={"user_id": user_id, "student_id": sid})
     except Exception as e:
         print(f"[Supabase Sync] Warning: Failed to sync parent_children for {user_id}: {e}")
 
 
 def sync_password(user_id: str, password_hash: str):
     """Update user password in Supabase synchronously."""
-    client = get_client()
-    if not client:
+    if not is_configured():
         return
+    client = get_client()
+    if client:
+        try:
+            client.table("users").update({"password_hash": password_hash}).eq("id", user_id).execute()
+            return
+        except Exception as e:
+            print(f"[Supabase Sync] SDK notice: {e}")
     try:
-        client.table("users").update({"password_hash": password_hash}).eq("id", user_id).execute()
+        _rest_request(f"users?id=eq.{user_id}", method='PATCH', data={"password_hash": password_hash})
     except Exception as e:
         print(f"[Supabase Sync] Warning: Failed to update password for {user_id}: {e}")
-

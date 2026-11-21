@@ -1,6 +1,7 @@
 -- ====================================================================
 -- Edutainal Maverick World - Supabase PostgreSQL Schema
 -- High-Performance Dual-Portal Learning Evidence & Evaluation System
+-- Fully Configured with Realtime Triggers & CDC Replication
 -- ====================================================================
 
 -- 1. Enable standard cryptographic extensions
@@ -16,7 +17,6 @@ DROP TABLE IF EXISTS observations CASCADE;
 DROP TABLE IF EXISTS students CASCADE;
 
 -- 3. Students Table
--- Stores learner demographic profiles, world tier, milestone targets, and pathway enrollments
 CREATE TABLE students (
     id TEXT PRIMARY KEY,
     data JSONB NOT NULL,
@@ -25,7 +25,6 @@ CREATE TABLE students (
 );
 
 -- 4. Observations & Assessments Table
--- Stores multi-pillar STEAMRE rubrics, behavioral observations, SDG links, and studio zones
 CREATE TABLE observations (
     id TEXT PRIMARY KEY,
     student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
@@ -35,7 +34,6 @@ CREATE TABLE observations (
 );
 
 -- 5. Users Table
--- Supports secure multi-role access (observer = company mentors, parent = student families)
 CREATE TABLE users (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     username TEXT UNIQUE NOT NULL,
@@ -54,7 +52,7 @@ CREATE TABLE parent_children (
     PRIMARY KEY (user_id, student_id)
 );
 
--- 7. Server Sessions Table (Rotating scrypt / sha256 session tokens)
+-- 7. Server Sessions Table
 CREATE TABLE auth_sessions (
     token_hash TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -83,6 +81,104 @@ CREATE INDEX idx_auth_sessions_expiry ON auth_sessions(expires_at);
 CREATE INDEX idx_login_attempts_time ON login_attempts(attempted_at DESC);
 
 -- ====================================================================
+-- Realtime CDC Replication (Full Identity)
+-- Required so Supabase Realtime emits full payloads on changes
+-- ====================================================================
+ALTER TABLE students REPLICA IDENTITY FULL;
+ALTER TABLE observations REPLICA IDENTITY FULL;
+ALTER TABLE users REPLICA IDENTITY FULL;
+ALTER TABLE parent_children REPLICA IDENTITY FULL;
+
+-- Add all core tables to the Supabase Realtime publication
+DO $$
+BEGIN
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE observations;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE students;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE users;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+    BEGIN
+        ALTER PUBLICATION supabase_realtime ADD TABLE parent_children;
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
+END $$;
+
+-- ====================================================================
+-- Database Triggers for Real-time Notification & Timestamps
+-- ====================================================================
+
+-- Trigger 1: Auto-update updated_at timestamp on student records
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = timezone('utc'::text, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_students_updated_at ON students;
+CREATE TRIGGER trg_students_updated_at
+    BEFORE UPDATE ON students
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger 2: Real-time Observation Notification (pg_notify)
+CREATE OR REPLACE FUNCTION notify_observation_change()
+RETURNS TRIGGER AS $$
+DECLARE
+    payload JSON;
+BEGIN
+    payload = json_build_object(
+        'event', TG_OP,
+        'table', TG_TABLE_NAME,
+        'id', NEW.id,
+        'student_id', NEW.student_id,
+        'observed_on', NEW.observed_on,
+        'created_at', NEW.created_at,
+        'data', NEW.data
+    );
+    PERFORM pg_notify('realtime_observations', payload::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_observation_change ON observations;
+CREATE TRIGGER trg_observation_change
+    AFTER INSERT OR UPDATE ON observations
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_observation_change();
+
+-- Trigger 3: Real-time Student Notification (pg_notify)
+CREATE OR REPLACE FUNCTION notify_student_change()
+RETURNS TRIGGER AS $$
+DECLARE
+    payload JSON;
+BEGIN
+    payload = json_build_object(
+        'event', TG_OP,
+        'table', TG_TABLE_NAME,
+        'id', NEW.id,
+        'data', NEW.data
+    );
+    PERFORM pg_notify('realtime_students', payload::text);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_student_change ON students;
+CREATE TRIGGER trg_student_change
+    AFTER INSERT OR UPDATE ON students
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_student_change();
+
+-- ====================================================================
 -- Row Level Security (RLS) Policies
 -- ====================================================================
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
@@ -92,63 +188,28 @@ ALTER TABLE parent_children ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
 
--- Service Role Policy (full backend access for FastAPI service key)
-CREATE POLICY "Service role full access on students" ON students
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
+-- Service role full access
+CREATE POLICY "Service role full access on students" ON students FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access on observations" ON observations FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access on users" ON users FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access on parent_children" ON parent_children FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access on auth_sessions" ON auth_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access on login_attempts" ON login_attempts FOR ALL TO service_role USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role full access on observations" ON observations
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
+-- Authenticated and Anon Public Access policies for REST & Realtime
+CREATE POLICY "Allow read on students" ON students FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "Allow anon insert on students" ON students FOR INSERT TO authenticated, anon WITH CHECK (true);
+CREATE POLICY "Allow anon update on students" ON students FOR UPDATE TO authenticated, anon USING (true);
 
-CREATE POLICY "Service role full access on users" ON users
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Allow read on observations" ON observations FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "Allow anon insert on observations" ON observations FOR INSERT TO authenticated, anon WITH CHECK (true);
+CREATE POLICY "Allow anon update on observations" ON observations FOR UPDATE TO authenticated, anon USING (true);
 
-CREATE POLICY "Service role full access on parent_children" ON parent_children
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon select on users" ON users FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "Allow anon insert on users" ON users FOR INSERT TO authenticated, anon WITH CHECK (true);
+CREATE POLICY "Allow anon update on users" ON users FOR UPDATE TO authenticated, anon USING (true);
 
-CREATE POLICY "Service role full access on auth_sessions" ON auth_sessions
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
-
-CREATE POLICY "Service role full access on login_attempts" ON login_attempts
-    FOR ALL TO service_role USING (true) WITH CHECK (true);
-
--- Authenticated Users & Anon Policies (Safe Read-Only for Public Demonstration)
-CREATE POLICY "Allow authenticated read on students" ON students
-    FOR SELECT TO authenticated, anon USING (true);
-
-CREATE POLICY "Allow authenticated read on observations" ON observations
-    FOR SELECT TO authenticated, anon USING (true);
-
--- ====================================================================
--- Realtime Subscriptions
--- Enables Supabase Realtime WebSocket notifications on new observations
--- ====================================================================
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_publication_tables 
-        WHERE pubname = 'supabase_realtime' AND tablename = 'observations'
-    ) THEN
-        ALTER PUBLICATION supabase_realtime ADD TABLE observations;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_publication_tables 
-        WHERE pubname = 'supabase_realtime' AND tablename = 'students'
-    ) THEN
-        ALTER PUBLICATION supabase_realtime ADD TABLE students;
-    END IF;
-END $$;
-
--- ====================================================================
--- Helpful Diagnostic View
--- ====================================================================
-CREATE OR REPLACE VIEW student_activity_summary AS
-SELECT 
-    s.id AS student_id,
-    s.data->>'name' AS student_name,
-    s.data->>'world_tier' AS world_tier,
-    COUNT(o.id) AS total_observations,
-    MAX(o.observed_on) AS last_observed_on
-FROM students s
-LEFT JOIN observations o ON s.id = o.student_id
-GROUP BY s.id, s.data->>'name', s.data->>'world_tier';
+CREATE POLICY "Allow anon select on parent_children" ON parent_children FOR SELECT TO authenticated, anon USING (true);
+CREATE POLICY "Allow anon insert on parent_children" ON parent_children FOR INSERT TO authenticated, anon WITH CHECK (true);
+CREATE POLICY "Allow anon update on parent_children" ON parent_children FOR UPDATE TO authenticated, anon USING (true);
+CREATE POLICY "Allow anon delete on parent_children" ON parent_children FOR DELETE TO authenticated, anon USING (true);
