@@ -23,7 +23,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from backend import auth
+from backend import auth, supabase_client
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = os.environ.get('PORTAL_DB', str(ROOT / 'backend' / 'portal-secure.sqlite3'))
@@ -461,8 +461,10 @@ def change_password(payload: PasswordChange, response: Response, actor=Depends(i
         user = db.execute('SELECT password_hash FROM users WHERE id=?', (actor['id'],)).fetchone()
         if not auth.verify_password(payload.current_password, user['password_hash']):
             raise HTTPException(400, 'Current password is incorrect')
-        db.execute('UPDATE users SET password_hash=? WHERE id=?', (auth.hash_password(payload.new_password), actor['id']))
+        new_hash = auth.hash_password(payload.new_password)
+        db.execute('UPDATE users SET password_hash=? WHERE id=?', (new_hash, actor['id']))
         db.execute('DELETE FROM auth_sessions WHERE user_id=?', (actor['id'],))
+    supabase_client.sync_password(actor['id'], new_hash)
     response.delete_cookie(auth.SESSION_COOKIE, path='/', secure=SECURE_COOKIES, httponly=True, samesite='strict')
     return {'status': 'password_changed'}
 
@@ -481,15 +483,18 @@ def parents(actor=Depends(identity)):
 def create_parent(payload: ParentCreate, actor=Depends(identity)):
     authorize(actor, write=True)
     user_id = uuid.uuid4().hex
+    pwhash = auth.hash_password(payload.password)
     try:
         with database() as db:
             for sid in set(payload.students):
                 read_student(db, sid)
             db.execute('INSERT INTO users (id,username,name,password_hash,role) VALUES (?,?,?,?,?)',
-                       (user_id, payload.username, payload.name.strip(), auth.hash_password(payload.password), 'parent'))
+                       (user_id, payload.username, payload.name.strip(), pwhash, 'parent'))
             db.executemany('INSERT INTO parent_children VALUES (?,?)', [(user_id, sid) for sid in set(payload.students)])
     except sqlite3.IntegrityError:
         raise HTTPException(409, 'That username is already in use')
+    supabase_client.sync_user(user_id, payload.username, payload.name.strip(), pwhash, 'parent')
+    supabase_client.sync_parent_children(user_id, list(set(payload.students)))
     return {'id': user_id, 'username': payload.username, 'name': payload.name, 'students': list(set(payload.students))}
 
 
@@ -504,6 +509,7 @@ def assign_children(uid: str, payload: ChildAssignments, actor=Depends(identity)
         db.execute('DELETE FROM parent_children WHERE user_id=?', (uid,))
         db.executemany('INSERT INTO parent_children VALUES (?,?)', [(uid, sid) for sid in set(payload.students)])
     broadcaster.broadcast('assignment_updated', {'parent_id': uid, 'students': list(set(payload.students))})
+    supabase_client.sync_parent_children(uid, list(set(payload.students)))
     return {'status': 'updated'}
 
 
@@ -718,6 +724,7 @@ def enroll(payload: StudentCreate, actor=Depends(identity)):
     except sqlite3.IntegrityError:
         raise HTTPException(409, 'Student ID already exists')
     broadcaster.broadcast('student_enrolled', {'student_id': payload.id, 'name': payload.name})
+    supabase_client.sync_student(payload.id, record)
     return record
 
 
@@ -771,4 +778,5 @@ def record_session(payload: SessionLogCreate, actor=Depends(identity)):
         'observed_on': str(payload.observed_on),
         'observer_name': data['observer_name']
     })
+    supabase_client.sync_observation(str(payload.id), payload.student_id, str(payload.observed_on), data['created_at'], data)
     return {'status': 'saved', 'session': data}

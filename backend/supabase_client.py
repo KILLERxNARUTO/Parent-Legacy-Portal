@@ -137,3 +137,80 @@ def push_sqlite_to_supabase(sqlite_path: Optional[str] = None) -> Dict[str, Any]
 
     con.close()
     return stats
+
+
+def sync_observation(obs_id: str, student_id: str, observed_on: str, created_at: str, data: dict):
+    """Background helper to sync an individual observation to Supabase if configured."""
+    client = get_client()
+    if not client:
+        return
+    try:
+        client.table("observations").upsert({
+            "id": obs_id,
+            "student_id": student_id,
+            "observed_on": observed_on,
+            "created_at": created_at,
+            "data": data
+        }).execute()
+    except Exception as e:
+        print(f"[Supabase Sync] Warning: Failed to sync observation {obs_id}: {e}")
+
+
+def sync_student(student_id: str, data: dict):
+    """Sync an individual student to Supabase synchronously."""
+    client = get_client()
+    if not client:
+        return
+    try:
+        client.table("students").upsert({
+            "id": student_id,
+            "data": data
+        }).execute()
+    except Exception as e:
+        print(f"[Supabase Sync] Warning: Failed to sync student {student_id}: {e}")
+
+
+def sync_user(user_id: str, username: str, name: str, password_hash: str, role: str, active: bool = True):
+    """Sync an individual user account to Supabase synchronously."""
+    client = get_client()
+    if not client:
+        return
+    try:
+        client.table("users").upsert({
+            "id": user_id,
+            "username": username,
+            "name": name,
+            "password_hash": password_hash,
+            "role": role,
+            "active": active
+        }).execute()
+    except Exception as e:
+        print(f"[Supabase Sync] Warning: Failed to sync user {username}: {e}")
+
+
+def sync_parent_children(user_id: str, student_ids: List[str]):
+    """Sync parent-child relationships to Supabase synchronously."""
+    client = get_client()
+    if not client:
+        return
+    try:
+        client.table("parent_children").delete().eq("user_id", user_id).execute()
+        for sid in student_ids:
+            client.table("parent_children").upsert({
+                "user_id": user_id,
+                "student_id": sid
+            }).execute()
+    except Exception as e:
+        print(f"[Supabase Sync] Warning: Failed to sync parent_children for {user_id}: {e}")
+
+
+def sync_password(user_id: str, password_hash: str):
+    """Update user password in Supabase synchronously."""
+    client = get_client()
+    if not client:
+        return
+    try:
+        client.table("users").update({"password_hash": password_hash}).eq("id", user_id).execute()
+    except Exception as e:
+        print(f"[Supabase Sync] Warning: Failed to update password for {user_id}: {e}")
+
