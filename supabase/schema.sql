@@ -172,11 +172,81 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_student_change ON students;
-CREATE TRIGGER trg_student_change
+CREATE OR REPLACE TRIGGER trg_student_change
     AFTER INSERT OR UPDATE ON students
     FOR EACH ROW
     EXECUTE FUNCTION notify_student_change();
+
+-- Trigger 4: Realtime Broadcast Changes (Official realtime.broadcast_changes)
+CREATE OR REPLACE FUNCTION public.broadcast_observation_changes()
+RETURNS trigger
+SECURITY DEFINER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM realtime.broadcast_changes(
+    'topic:observations',
+    TG_OP,
+    TG_OP,
+    TG_TABLE_NAME,
+    TG_TABLE_SCHEMA,
+    NEW,
+    OLD
+  );
+  PERFORM realtime.broadcast_changes(
+    'topic:student:' || coalesce(NEW.student_id, OLD.student_id)::text,
+    TG_OP,
+    TG_OP,
+    TG_TABLE_NAME,
+    TG_TABLE_SCHEMA,
+    NEW,
+    OLD
+  );
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_broadcast_observations
+AFTER INSERT OR UPDATE OR DELETE
+ON public.observations
+FOR EACH ROW
+EXECUTE FUNCTION broadcast_observation_changes();
+
+-- Trigger 5: Realtime Student Broadcast Changes
+CREATE OR REPLACE FUNCTION public.broadcast_student_changes()
+RETURNS trigger
+SECURITY DEFINER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  PERFORM realtime.broadcast_changes(
+    'topic:students',
+    TG_OP,
+    TG_OP,
+    TG_TABLE_NAME,
+    TG_TABLE_SCHEMA,
+    NEW,
+    OLD
+  );
+  PERFORM realtime.broadcast_changes(
+    'topic:student:' || coalesce(NEW.id, OLD.id)::text,
+    TG_OP,
+    TG_OP,
+    TG_TABLE_NAME,
+    TG_TABLE_SCHEMA,
+    NEW,
+    OLD
+  );
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_broadcast_students
+AFTER INSERT OR UPDATE OR DELETE
+ON public.students
+FOR EACH ROW
+EXECUTE FUNCTION broadcast_student_changes();
+
 
 -- ====================================================================
 -- Row Level Security (RLS) Policies
