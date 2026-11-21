@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Edutainal | Parent Sign In</title>
+  <link rel="stylesheet" href="/static/auth.css">
+  <link rel="icon" href="/assets/edutainal_maverick_world_logo.png">
+  <script defer src="/static/auth.js"></script>
+</head>
+<body data-portal="parent">
+  <aside class="auth-story">
+    <a class="auth-brand" href="/">EDUTAINAL</a>
+    <div class="eyebrow">MAVERICK WORLD</div>
+    <h1>A clear view of<br>your child's progress.</h1>
+    <p>Follow your children's learning, test results, and mentor feedback in one private dashboard.</p>
+    <div class="auth-rule"></div>
+    <small>Learning, made visible.</small>
+  </aside>
+
+  <main class="auth-content">
+    <section class="auth-card">
+      <span class="auth-badge">
+        PARENT CONSOLE ACCESS
+      </span>
+
+      <h2>Parent Sign In</h2>
+      <p>Enter your registered Parent Email or Username and Password to access your child's private learning analytics, rubrics, and certificates.</p>
+
+      <form id="login-form">
+        <label for="username">Parent Email / Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required maxlength="80" autocapitalize="none"
+          spellcheck="false" placeholder="e.g. parent.aarav@gmail.com or parent.aarav">
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128"
+          placeholder="Enter your password">
+
+        <button type="submit">
+          Sign In to Parent Portal
+        </button>
+
+        <p id="login-status" class="auth-status" role="status"></p>
+      </form>
+
+      <div class="security-notice-box">
+        <strong style="color:#1e293b;">Protected Parent Access:</strong>
+        <p style="margin: 4px 0 0; font-size: 11px; color: #64748b;">
+          Parent accounts are assigned exclusively to enrolled children by your learning center. Passwords are encrypted with Scrypt multi-round security.
+        </p>
+      </div>
+
+      <p class="auth-help"><a href="/">Back to portal selection</a></p>
+    </section>
+  </main>
+</body>
+</html>

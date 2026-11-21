@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="shell-type" content="web_dashboard">
+  <title>Edutainal | Company Workspace · Learning Evidence &amp; Evaluation</title>
+  <link rel="icon" href="/assets/edutainal_maverick_world_logo.png">
+
+  <!-- Google Fonts: DM Sans, JetBrains Mono, Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN & Design System Config from design.md -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#004e48",
+            "primary-container": "#006860",
+            "on-primary": "#ffffff",
+            "on-primary-container": "#94e4d9",
+            "primary-fixed": "#a1f1e6",
+            "primary-fixed-dim": "#85d5ca",
+            "on-primary-fixed": "#00201d",
+            "on-primary-fixed-variant": "#00504a",
+            "inverse-primary": "#85d5ca",
+            "secondary": "#45636b",
+            "secondary-container": "#c5e5ee",
+            "on-secondary": "#ffffff",
+            "on-secondary-container": "#49676f",
+            "secondary-fixed": "#c8e8f1",
+            "secondary-fixed-dim": "#acccd5",
+            "on-secondary-fixed": "#001f26",
+            "on-secondary-fixed-variant": "#2d4b53",
+            "tertiary": "#594000",
+            "tertiary-container": "#765705",
+            "on-tertiary": "#ffffff",
+            "on-tertiary-container": "#facf77",
+            "tertiary-fixed": "#ffdea1",
+            "tertiary-fixed-dim": "#ebc16a",
+            "on-tertiary-fixed": "#261900",
+            "on-tertiary-fixed-variant": "#5c4300",
+            "gold-accent": "#efc46d",
+            "background": "#effbff",
+            "surface": "#effbff",
+            "surface-bright": "#effbff",
+            "surface-dim": "#bfe0e8",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#def8ff",
+            "surface-container": "#d2f4fc",
+            "surface-container-high": "#cdeef7",
+            "surface-container-highest": "#c7e8f1",
+            "surface-variant": "#c7e8f1",
+            "on-surface": "#001f25",
+            "on-surface-variant": "#3e4947",
+            "on-background": "#001f25",
+            "dark-petrol": "#15343b",
+            "company-dark": "#0c1322",
+            "inverse-surface": "#14353b",
+            "inverse-on-surface": "#d6f6ff",
+            "outline": "#6e7977",
+            "outline-variant": "#bec9c6",
+            "focus-ring": "#e9ba68",
+            "live-broadcast": "#3ca58e",
+            "skill-science": "#168b81",
+            "skill-technology": "#5276d2",
+            "skill-research": "#b083d4",
+            "skill-engineering": "#dc9c3c",
+            "skill-arts": "#d9718b",
+            "skill-mathematics": "#44a7bb",
+            "skill-energy": "#83a64a",
+            "skill-resilience": "#65738c",
+            "trend-up": "#168b81",
+            "trend-up-bg": "#edf7f3",
+            "trend-down": "#b2714d",
+            "trend-down-bg": "#fbf3ec",
+            "trend-neutral": "#83949c",
+            "trend-neutral-bg": "#f1f4f7",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a"
+          },
+          fontFamily: {
+            "headline-display": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-md": ["Plus Jakarta Sans", "sans-serif"],
+            "body-lg": ["DM Sans", "sans-serif"],
+            "body-default": ["DM Sans", "sans-serif"],
+            "body-sm": ["DM Sans", "sans-serif"],
+            "label-default": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-metric": ["JetBrains Mono", "monospace"],
+            "eyebrow": ["JetBrains Mono", "monospace"],
+            "label-micro": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Custom Observer Panel Styling matching Stitch Design System */
+    .panel {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(16px);
+      border-radius: 1.25rem;
+      padding: 1.5rem;
+      border: 1px solid rgba(197, 229, 238, 0.5);
+      box-shadow: 0 12px 38px rgba(32, 79, 95, 0.05);
+      margin-bottom: 1.5rem;
+    }
+    .panel h2 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #15343b;
+      margin-bottom: 0.5rem;
+    }
+    .panel p {
+      font-size: 0.875rem;
+      color: #49676f;
+      line-height: 1.5;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .form-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: #15343b;
+    }
+    .form-grid label.wide {
+      grid-column: 1 / -1;
+    }
+    .form-grid input, .form-grid select, .form-grid textarea {
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.625rem;
+      border: 1px solid #bec9c6;
+      background: #ffffff;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: #001f25;
+      transition: all 0.2s;
+    }
+    .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus {
+      outline: 2px solid #006860;
+      border-color: #006860;
+    }
+    .form-grid textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+    .rubric {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+      background: #f1f8fa;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid #c5e5ee;
+    }
+    .rubric label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #15343b;
+    }
+    .rubric select {
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.5rem;
+      border: 1px solid #bec9c6;
+      background: #ffffff;
+      font-size: 0.8125rem;
+    }
+    .form-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 1.25rem;
+    }
+    .form-actions button, button[type="submit"] {
+      padding: 0.65rem 1.25rem;
+      border-radius: 0.625rem;
+      background: #006860;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.875rem;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+    .form-actions button:hover, button[type="submit"]:hover {
+      background: #004e48;
+    }
+    .form-actions button.secondary, button.secondary {
+      background: #e2f1f5;
+      color: #15343b;
+      border: 1px solid #c5e5ee;
+    }
+    .form-actions button.secondary:hover, button.secondary:hover {
+      background: #d0e8ef;
+    }
+    details summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #006860;
+      font-size: 0.9375rem;
+      user-select: none;
+    }
+    .child-choices {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.5rem;
+      border: 1px solid #c5e5ee;
+      border-radius: 0.75rem;
+      padding: 0.85rem;
+      margin: 1rem 0;
+      background: #ffffff;
+    }
+    .child-choice {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      color: #15343b;
+      cursor: pointer;
+    }
+    .parent-account {
+      margin-top: 0.75rem;
+      padding: 0.85rem;
+      background: #ffffff;
+      border: 1px solid #c5e5ee;
+      border-radius: 0.75rem;
+    }
+    .parent-account summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .live-dot.pulse {
+      animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.15); }
+    }
+    :focus-visible {
+      outline: 3px solid #e9ba68 !important;
+      outline-offset: 3px !important;
+    }
+  </style>
+
+  <!-- Core Dashboard & Portal Scripts -->
+  <script defer src="/static/motion.js?v=glass-1"></script>
+  <script defer src="/static/analytics.js?v=class-progress-1"></script>
+  <script defer src="/static/progress.js?v=class-progress-1"></script>
+  <script defer src="/static/dashboard.js?v=class-progress-1"></script>
+  <script defer src="/static/accounts.js?v=auth-1"></script>
+  <script defer src="/static/portal.js?v=auth-1"></script>
+</head>
+
+<body class="session-loading bg-surface text-on-surface font-body-default min-h-screen antialiased selection:bg-primary-container selection:text-on-primary-container" data-role="observer">
+
+  <!-- A. Fixed Left Sidebar (Stitch Design Specification) -->
+  <aside class="fixed left-4 top-4 bottom-4 w-60 bg-dark-petrol text-surface-container-lowest rounded-[24px] shadow-[0_12px_38px_rgba(21,52,59,0.22)] p-4 flex flex-col justify-between z-50 transition-all duration-300">
+    <div class="flex flex-col gap-6">
+      <!-- Brand Logo Header -->
+      <a href="/company" class="flex items-center gap-3 px-2 py-1 group">
+        <div class="w-10 h-10 rounded-xl bg-surface-container-lowest/10 p-1 flex items-center justify-center border border-white/10 shadow-sm group-hover:scale-105 transition-transform duration-200">
+          <img src="/assets/edutainal_maverick_world_logo.png" alt="Edutainal Logo" class="w-full h-full object-contain">
+        </div>
+        <div class="flex flex-col">
+          <span class="font-headline-lg font-bold tracking-tight text-white leading-none">EDUTAINAL</span>
+          <span class="font-eyebrow text-[9px] tracking-[0.2em] text-[#a1f1e6] uppercase mt-0.5">MAVERICK WORLD</span>
+        </div>
+      </a>
+
+      <!-- Workspace Role Pill -->
+      <div class="px-3 py-1.5 rounded-lg bg-white/10 border border-white/10 text-[#a1f1e6] font-eyebrow text-[10px] uppercase tracking-wider flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-live-broadcast animate-pulse"></span>
+        <span>COMPANY OBSERVER</span>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex flex-col gap-1.5" aria-label="Company portal navigation">
+        <a href="/company" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/15 text-white font-headline-md text-sm font-semibold transition-colors duration-150 shadow-sm" aria-current="page">
+          <span class="material-symbols-outlined text-[20px] text-[#a1f1e6]">analytics</span>
+          <span>Student Records</span>
+        </a>
+        <a href="#assessment" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-container-high/80 hover:text-white hover:bg-white/10 font-headline-md text-sm font-medium transition-colors duration-150">
+          <span class="material-symbols-outlined text-[20px]">assignment_add</span>
+          <span>Observations &amp; Rubrics</span>
+        </a>
+        <a href="#enrollment" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-container-high/80 hover:text-white hover:bg-white/10 font-headline-md text-sm font-medium transition-colors duration-150">
+          <span class="material-symbols-outlined text-[20px]">person_add</span>
+          <span>Enroll Learner</span>
+        </a>
+        <a href="#parent-accounts" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-surface-container-high/80 hover:text-white hover:bg-white/10 font-headline-md text-sm font-medium transition-colors duration-150">
+          <span class="material-symbols-outlined text-[20px]">manage_accounts</span>
+          <span>Parent Accounts</span>
+        </a>
+      </nav>
+
+      <!-- Mission Callout Box -->
+      <div class="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5 text-xs text-surface-container-high/70">
+        <div class="flex items-center gap-1.5 text-[#a1f1e6] font-semibold">
+          <span class="material-symbols-outlined text-[16px]">verified</span>
+          <span>STEAMRE Rubric</span>
+        </div>
+        <p class="leading-relaxed text-[11px]">
+          Record uncompromised evidence. Gaps remain unobserved and are never plotted as synthetic zeros.
+        </p>
+      </div>
+    </div>
+
+    <!-- Mentor Footer Profile & Quick Switch -->
+    <div class="pt-3 border-t border-white/10 flex flex-col gap-2">
+      <a href="/parent" target="_blank" class="flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-[#a1f1e6] font-medium transition-colors">
+        <span class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[16px]">visibility</span>
+          <span>Preview Parent View</span>
+        </span>
+        <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+      </a>
+
+      <div class="flex items-center gap-3 px-2 py-1">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-[#3ca58e] text-white flex items-center justify-center font-headline-md text-xs font-bold ring-2 ring-white/20 shadow-md">
+          EV
+        </div>
+        <div class="flex flex-col min-w-0">
+          <span id="signed-in-name" class="font-headline-md text-xs font-semibold text-white truncate">Edutainal Mentor</span>
+          <span class="font-eyebrow text-[9px] text-[#a1f1e6] uppercase">Authorized Observer</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- B. Floating Top Navigation Bar -->
+  <header class="fixed top-4 left-[272px] right-4 h-16 bg-surface-container-lowest/85 backdrop-blur-xl rounded-[20px] shadow-[0_12px_38px_rgba(32,79,95,0.07)] border border-secondary-container/40 flex items-center justify-between px-6 z-40">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 text-xs font-eyebrow text-on-surface-variant">
+        <span class="text-primary font-bold">COMPANY PORTAL</span>
+        <span>/</span>
+        <strong class="text-dark-petrol">OBSERVER WORKSPACE</strong>
+      </div>
+
+      <!-- Real-Time Live Sync Indicator -->
+      <div class="live-sync-indicator inline-flex items-center gap-2 px-3 py-1 rounded-full bg-trend-up-bg border border-trend-up/20 text-trend-up font-label-micro text-label-micro font-semibold" title="Real-time multi-portal WebSocket / SSE synchronization active">
+        <span class="live-dot pulse w-2 h-2 rounded-full bg-live-broadcast"></span>
+        <span>Live Sync Active</span>
+      </div>
+    </div>
+
+    <!-- Topbar Controls -->
+    <div class="flex items-center gap-3">
+      <!-- Learner Selector -->
+      <div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-xl border border-secondary-container/60">
+        <span class="material-symbols-outlined text-[18px] text-secondary">person_search</span>
+        <label for="student" class="sr-only">Selected learner</label>
+        <select id="student" aria-label="Selected learner" class="bg-transparent text-sm font-semibold text-dark-petrol focus:outline-none cursor-pointer pr-2">
+          <!-- Populated by portal.js loadRoster() -->
+        </select>
+      </div>
+
+      <!-- Quick Action: Record Observation -->
+      <a href="#assessment" class="record-link hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white font-headline-md text-xs font-semibold shadow-sm hover:bg-primary-container transition-colors">
+        <span class="material-symbols-outlined text-[16px]">add_circle</span>
+        <span>Record Class</span>
+      </a>
+
+      <!-- Refresh Button -->
+      <button id="refresh" class="p-2 rounded-xl text-on-surface-variant hover:text-dark-petrol hover:bg-surface-container-high transition-colors" title="Reload saved records">
+        <span class="material-symbols-outlined text-[20px]">refresh</span>
+      </button>
+
+      <!-- Print Report -->
+      <button id="print" class="p-2 rounded-xl text-on-surface-variant hover:text-dark-petrol hover:bg-surface-container-high transition-colors" title="Print student report">
+        <span class="material-symbols-outlined text-[20px]">print</span>
+      </button>
+
+      <!-- Password Dialog -->
+      <button id="account-button" class="p-2 rounded-xl text-on-surface-variant hover:text-dark-petrol hover:bg-surface-container-high transition-colors" title="Change Account Password">
+        <span class="material-symbols-outlined text-[20px]">key</span>
+      </button>
+
+      <!-- Sign Out -->
+      <button id="logout" class="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-error/10 hover:bg-error/20 text-error font-headline-md text-xs font-semibold transition-colors" title="Sign out of workspace">
+        <span class="material-symbols-outlined text-[16px]">logout</span>
+        <span>Sign Out</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- C. Main Application Scroll Surface -->
+  <main id="main" class="pl-[272px] pr-4 pt-24 pb-12 min-h-screen bg-surface">
+    <div class="max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-6">
+
+      <!-- Status & Notice Banner -->
+      <div id="mode-note" class="hidden"></div>
+      <div class="flex items-center justify-between text-xs font-eyebrow text-on-surface-variant">
+        <p class="eyebrow" id="eyebrow">OBSERVE • UNDERSTAND • SUPPORT</p>
+        <p id="status" role="status" aria-live="polite" class="text-secondary font-medium"></p>
+      </div>
+
+      <!-- Learner Title Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-secondary-container/40">
+        <div>
+          <h1 id="heading" class="font-headline-display text-2xl sm:text-3xl font-bold text-dark-petrol tracking-tight">
+            Company Workspace
+          </h1>
+          <p id="intro" class="font-body-default text-on-surface-variant text-sm mt-1">
+            Loading enrolled learner data...
+          </p>
+        </div>
+      </div>
+
+      <!-- Enrollment Form Section (Dynamic Injection by portal.js) -->
+      <section id="enrollment" hidden></section>
+
+      <!-- Assessment Form Section (Dynamic Injection by portal.js) -->
+      <section id="assessment" hidden></section>
+
+      <!-- Parent Accounts Management Section (Dynamic Injection by accounts.js) -->
+      <section id="parent-accounts" hidden></section>
+
+      <!-- Stitch Dashboard Container (Rendered dynamically by dashboard.js) -->
+      <div id="report"></div>
+
+      <!-- Footer -->
+      <footer class="mt-12 pt-6 border-t border-secondary-container/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-eyebrow text-on-surface-variant">
+        <span>EDUTAINAL MAVERICK WORLD · Learning, made visible.</span>
+        <span>Every verified evaluation begins with genuine classroom evidence.</span>
+      </footer>
+
+    </div>
+  </main>
+
+  <!-- Password Change Modal Dialog -->
+  <dialog id="account-dialog" class="backdrop:bg-black/50 p-0 rounded-2xl shadow-2xl border border-secondary-container/60 max-w-md w-full">
+    <div class="bg-surface-container-lowest p-6 rounded-2xl">
+      <form id="password-form" class="flex flex-col gap-4">
+        <div class="flex items-center justify-between pb-3 border-b border-secondary-container/40">
+          <h2 class="font-headline-lg text-lg font-bold text-dark-petrol">Change Password</h2>
+          <button type="button" id="close-account" class="p-1 rounded-lg text-slate-400 hover:text-dark-petrol hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+        <p class="text-xs text-on-surface-variant leading-relaxed">
+          Updating your password revokes all active observer sessions immediately. You will be prompted to authenticate again.
+        </p>
+
+        <div>
+          <label class="block text-xs font-semibold text-dark-petrol mb-1">Current Password</label>
+          <input name="current_password" type="password" autocomplete="current-password" required maxlength="128" class="w-full px-3 py-2 border border-secondary-container rounded-lg text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-dark-petrol mb-1">New Password (12+ characters)</label>
+          <input name="new_password" type="password" autocomplete="new-password" required minlength="12" maxlength="128" class="w-full px-3 py-2 border border-secondary-container rounded-lg text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-dark-petrol mb-1">Confirm New Password</label>
+          <input name="confirm_password" type="password" autocomplete="new-password" required minlength="12" maxlength="128" class="w-full px-3 py-2 border border-secondary-container rounded-lg text-sm">
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-secondary-container/40">
+          <button type="submit" class="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-colors">
+            Save New Password
+          </button>
+        </div>
+        <p id="password-status" role="status" class="text-xs text-error font-medium"></p>
+      </form>
+    </div>
+  </dialog>
+
+</body>
+</html>

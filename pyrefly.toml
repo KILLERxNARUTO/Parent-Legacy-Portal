@@ -1,0 +1,8 @@
+[environment]
+python-version = "3.13"
+python-executable = "C:/Users/syedt/AppData/Local/Programs/Python/Python313/python.exe"
+search-paths = [
+  "C:/Users/syedt/AppData/Local/Programs/Python/Python313/Lib/site-packages",
+  "."
+]
+

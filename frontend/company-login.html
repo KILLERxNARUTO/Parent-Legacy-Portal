@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edutainal | Company Workspace · Secure Observer Gateway</title>
+  <link rel="icon" href="/assets/edutainal_maverick_world_logo.png">
+
+  <!-- Google Fonts: DM Sans, JetBrains Mono, Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN & Design System Config from design.md -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#004e48",
+            "primary-container": "#006860",
+            "on-primary": "#ffffff",
+            "on-primary-container": "#94e4d9",
+            "primary-fixed": "#a1f1e6",
+            "primary-fixed-dim": "#85d5ca",
+            "on-primary-fixed": "#00201d",
+            "on-primary-fixed-variant": "#00504a",
+            "inverse-primary": "#85d5ca",
+            "secondary": "#45636b",
+            "secondary-container": "#c5e5ee",
+            "on-secondary": "#ffffff",
+            "on-secondary-container": "#49676f",
+            "secondary-fixed": "#c8e8f1",
+            "secondary-fixed-dim": "#acccd5",
+            "on-secondary-fixed": "#001f26",
+            "on-secondary-fixed-variant": "#2d4b53",
+            "tertiary": "#594000",
+            "tertiary-container": "#765705",
+            "on-tertiary": "#ffffff",
+            "on-tertiary-container": "#facf77",
+            "tertiary-fixed": "#ffdea1",
+            "tertiary-fixed-dim": "#ebc16a",
+            "on-tertiary-fixed": "#261900",
+            "on-tertiary-fixed-variant": "#5c4300",
+            "gold-accent": "#efc46d",
+            "background": "#0c1322",
+            "surface": "#111a2e",
+            "surface-bright": "#16233d",
+            "surface-dim": "#080d17",
+            "surface-container-lowest": "#0a101d",
+            "surface-container-low": "#111a2e",
+            "surface-container": "#18243c",
+            "surface-container-high": "#1f2e4b",
+            "surface-container-highest": "#28395b",
+            "surface-variant": "#1f2e4b",
+            "on-surface": "#e2e8f0",
+            "on-surface-variant": "#94a3b8",
+            "on-background": "#f8fafc",
+            "dark-petrol": "#15343b",
+            "company-dark": "#0c1322",
+            "inverse-surface": "#effbff",
+            "inverse-on-surface": "#001f25",
+            "outline": "#475569",
+            "outline-variant": "#334155",
+            "focus-ring": "#e9ba68",
+            "live-broadcast": "#3ca58e",
+            "trend-up": "#168b81",
+            "trend-up-bg": "rgba(22, 139, 129, 0.15)",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "on-error": "#ffffff",
+            "on-error-container": "#93000a"
+          },
+          fontFamily: {
+            "headline-display": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-md": ["Plus Jakarta Sans", "sans-serif"],
+            "body-lg": ["DM Sans", "sans-serif"],
+            "body-default": ["DM Sans", "sans-serif"],
+            "body-sm": ["DM Sans", "sans-serif"],
+            "label-default": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-metric": ["JetBrains Mono", "monospace"],
+            "eyebrow": ["JetBrains Mono", "monospace"],
+            "label-micro": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :focus-visible {
+      outline: 3px solid #e9ba68 !important;
+      outline-offset: 3px !important;
+    }
+  </style>
+  <script defer src="/static/auth.js"></script>
+</head>
+
+<body data-portal="company" class="bg-company-dark text-on-surface font-body-default min-h-screen flex flex-col md:flex-row antialiased selection:bg-primary-container selection:text-on-primary-container">
+
+  <!-- Left Hero Column (Desktop) -->
+  <aside class="md:w-[48%] lg:w-[44%] bg-gradient-to-br from-dark-petrol via-[#0e2126] to-company-dark text-white p-8 md:p-14 lg:p-16 flex flex-col justify-between border-b md:border-b-0 md:border-r border-outline-variant/30 relative overflow-hidden">
+    <!-- Ambient glow orbs -->
+    <div class="absolute -top-24 -left-24 w-96 h-96 bg-primary-container/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-[#3ca58e]/15 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 flex flex-col">
+      <!-- Brand Header -->
+      <a href="/" class="flex items-center gap-3 group w-fit">
+        <div class="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-md p-1.5 border border-white/20 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-200">
+          <img src="/assets/edutainal_maverick_world_logo.png" alt="Logo" class="w-full h-full object-contain">
+        </div>
+        <div class="flex flex-col">
+          <span class="font-headline-lg font-bold tracking-tight text-white leading-none">EDUTAINAL</span>
+          <span class="font-eyebrow text-[10px] tracking-[0.2em] text-[#85d5ca] uppercase mt-0.5">MAVERICK WORLD</span>
+        </div>
+      </a>
+
+      <!-- Security Eyebrow -->
+      <div class="mt-16 md:mt-24 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[#a1f1e6] font-eyebrow text-eyebrow w-fit uppercase">
+        <span class="w-2 h-2 rounded-full bg-live-broadcast animate-pulse"></span>
+        RESTRICTED OBSERVER GATEWAY
+      </div>
+
+      <!-- Main Headline -->
+      <h1 class="font-headline-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mt-6 leading-[1.15]">
+        High-Security<br><span class="text-[#a1f1e6]">Observer Console.</span>
+      </h1>
+
+      <p class="font-body-lg text-slate-300 mt-4 leading-relaxed max-w-lg">
+        Restricted environment for authorized mentors, company observers, and administrators to evaluate student trajectories, record STEAMRE rubrics, and manage parent credentials.
+      </p>
+
+      <div class="w-16 h-1 bg-[#85d5ca] rounded-full my-8"></div>
+    </div>
+
+    <!-- Security Meta Footer -->
+    <div class="relative z-10 flex flex-col gap-2 pt-6 border-t border-white/10 text-xs text-slate-400 font-label-micro">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-[16px] text-[#85d5ca]">verified_user</span>
+        <span>Enterprise Access Control · Scrypt Multi-Round Cryptography</span>
+      </div>
+      <div>Session tokens are strictly isolated per portal and auto-expire.</div>
+    </div>
+  </aside>
+
+  <!-- Right Authentication Card -->
+  <main class="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-14 bg-company-dark">
+    <div class="w-full max-w-md bg-surface border border-outline-variant/40 rounded-2xl shadow-2xl p-7 sm:p-9 relative">
+
+      <!-- Status Badge -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[#16233d] border border-outline-variant/60 text-[#38bdf8] font-eyebrow text-[10px] font-bold tracking-wider uppercase mb-5">
+        <span class="material-symbols-outlined text-[14px]">shield</span>
+        AUTHORIZED PERSONNEL ONLY
+      </div>
+
+      <h2 class="font-headline-lg text-2xl font-bold text-white tracking-tight">
+        Company Sign In
+      </h2>
+      <p class="font-body-default text-on-surface-variant mt-2 text-sm">
+        Enter your assigned Company Login ID and Password to authenticate your workspace session.
+      </p>
+
+      <!-- Login Form -->
+      <form id="login-form" class="mt-6 flex flex-col gap-4">
+        <div>
+          <label for="username" class="block font-label-default text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+            Company Login ID
+          </label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3.5 top-3.5 text-slate-400 text-[18px]">badge</span>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              required
+              maxlength="80"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="e.g. company.admin"
+              class="w-full pl-10 pr-4 py-3 bg-surface-container border border-outline-variant/60 rounded-xl text-white placeholder-slate-500 font-body-default text-sm focus:border-focus-ring focus:bg-surface-container-high transition-colors"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label for="password" class="block font-label-default text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">
+            Password
+          </label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3.5 top-3.5 text-slate-400 text-[18px]">lock</span>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+              maxlength="128"
+              placeholder="Enter secure password"
+              class="w-full pl-10 pr-4 py-3 bg-surface-container border border-outline-variant/60 rounded-xl text-white placeholder-slate-500 font-body-default text-sm focus:border-focus-ring focus:bg-surface-container-high transition-colors"
+            >
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full mt-2 py-3.5 px-4 rounded-xl bg-gradient-to-r from-primary-container to-dark-petrol hover:from-[#005a53] hover:to-[#1b434c] text-white font-headline-md text-sm font-semibold tracking-wide flex items-center justify-center gap-2 border border-[#85d5ca]/30 shadow-lg shadow-black/40 hover:shadow-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+        >
+          <span class="material-symbols-outlined text-[18px]">key</span>
+          <span>Authenticate &amp; Enter Workspace</span>
+        </button>
+
+        <p id="login-status" class="font-body-sm text-xs min-h-[1.25rem] text-error font-medium" role="status"></p>
+      </form>
+
+      <!-- Active Safeguards Card -->
+      <div class="mt-4 p-4 rounded-xl bg-surface-container/70 border border-outline-variant/30 flex flex-col gap-2.5">
+        <div class="flex items-center gap-2 text-slate-200 font-headline-md text-xs font-semibold">
+          <span class="material-symbols-outlined text-[16px] text-[#85d5ca]">gite</span>
+          <span>Active Security Safeguards</span>
+        </div>
+        <ul class="flex flex-col gap-1.5 text-xs text-slate-400">
+          <li class="flex items-center gap-2">
+            <span class="text-live-broadcast font-bold">✓</span>
+            <span>Scrypt cryptographic password verification</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="text-live-broadcast font-bold">✓</span>
+            <span>Automated brute-force throttling &amp; 15-min IP lockout</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="text-live-broadcast font-bold">✓</span>
+            <span>Isolated HTTP-only session cookies with CSRF defense</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Footer Links -->
+      <div class="mt-6 pt-5 border-t border-outline-variant/30 flex items-center justify-between text-xs text-slate-400">
+        <a href="/" class="hover:text-white transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">arrow_back</span>
+          <span>Portal Selection</span>
+        </a>
+        <a href="/parent/login" class="text-[#85d5ca] hover:underline">
+          Go to Parent Sign In
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+</html>
