@@ -4,9 +4,20 @@ import getpass
 import json
 import secrets
 import sqlite3
+import sys
 import uuid
 from pathlib import Path
-from backend import main, auth
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / 'backend') not in sys.path:
+    sys.path.insert(0, str(ROOT / 'backend'))
+
+try:
+    from backend import main, auth
+except ImportError:
+    import main, auth
 
 
 def add_user(username, name, password, role, children=()):

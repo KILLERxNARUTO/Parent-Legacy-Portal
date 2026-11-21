@@ -9,13 +9,20 @@ import hmac
 import time
 from contextlib import asynccontextmanager, contextmanager
 from datetime import date, datetime, timezone, timedelta
+import sys
 from pathlib import Path
 from typing import Annotated, Literal
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / 'backend') not in sys.path:
+    sys.path.insert(0, str(ROOT / 'backend'))
 
 # Load .env file if present (python-dotenv is optional; fall back gracefully)
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+    load_dotenv(ROOT / '.env')
 except ImportError:
     pass
 
@@ -23,7 +30,11 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from backend import auth, supabase_client
+
+try:
+    from backend import auth, supabase_client
+except ImportError:
+    import auth, supabase_client
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = os.environ.get('PORTAL_DB', str(ROOT / 'backend' / 'portal-secure.sqlite3'))

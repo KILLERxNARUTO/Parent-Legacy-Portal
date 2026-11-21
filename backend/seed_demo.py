@@ -5,12 +5,14 @@ Existing records are preserved; repeat runs skip already saved sample sessions.
 """
 import json
 import argparse
+import os
 from datetime import date, timedelta
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import NAMESPACE_URL, uuid5
 
-BASE_URL = 'http://127.0.0.1:8000/api/v1'
+BACKEND_BASE = os.environ.get('BACKEND_URL', 'http://127.0.0.1:8000').rstrip('/')
+BASE_URL = f'{BACKEND_BASE}/api/v1'
 
 
 def api(path, payload=None):
