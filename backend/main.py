@@ -19,12 +19,24 @@ if str(ROOT) not in sys.path:
 if str(ROOT / 'backend') not in sys.path:
     sys.path.insert(0, str(ROOT / 'backend'))
 
-# Load .env file if present (python-dotenv is optional; fall back gracefully)
-try:
-    from dotenv import load_dotenv
-    load_dotenv(ROOT / '.env')
-except ImportError:
-    pass
+def _load_env():
+    env_file = ROOT / '.env'
+    if not env_file.exists():
+        return
+    try:
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    if k not in os.environ:
+                        os.environ[k] = v
+    except Exception:
+        pass
+
+_load_env()
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, StreamingResponse

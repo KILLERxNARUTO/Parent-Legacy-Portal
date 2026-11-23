@@ -7,19 +7,15 @@ Enables seamless dual-mode database operation:
 import os
 import json
 import sqlite3
+import urllib.request
+import urllib.parse
+import urllib.error
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Safe .env loader (with built-in fallback parser if python-dotenv is not installed)
-try:
-    from dotenv import load_dotenv
-    load_dotenv(ROOT / '.env')
-except ImportError:
-    pass
-
-def _load_env_fallback():
+def _load_env():
     env_file = ROOT / '.env'
     if not env_file.exists():
         return
@@ -36,7 +32,7 @@ def _load_env_fallback():
     except Exception:
         pass
 
-_load_env_fallback()
+_load_env()
 
 SQLITE_DB = ROOT / 'backend' / 'portal-secure.sqlite3'
 
@@ -75,8 +71,7 @@ def get_client() -> Any:
 
 
 def _rest_request(endpoint: str, method: str = 'GET', data: Optional[Any] = None, params: Optional[Dict[str, str]] = None) -> Any:
-    """Zero-dependency HTTP fallback using standard httpx for robust REST operations."""
-    import httpx
+    """Zero-dependency HTTP fallback using standard urllib for robust REST operations."""
     key = SUPABASE_KEY or SUPABASE_ANON_KEY
     headers = {
         'apikey': key,
@@ -85,19 +80,20 @@ def _rest_request(endpoint: str, method: str = 'GET', data: Optional[Any] = None
         'Prefer': 'resolution=merge-duplicates,return=representation'
     }
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/{endpoint}"
-    with httpx.Client(timeout=10.0) as client:
-        if method == 'GET':
-            resp = client.get(url, headers=headers, params=params)
-        elif method == 'POST':
-            resp = client.post(url, headers=headers, json=data)
-        elif method == 'DELETE':
-            resp = client.delete(url, headers=headers, params=params)
-        elif method == 'PATCH':
-            resp = client.patch(url, headers=headers, json=data, params=params)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
-        resp.raise_for_status()
-        return resp.json() if resp.text else None
+    if params:
+        query_string = urllib.parse.urlencode(params)
+        url = f"{url}&{query_string}" if '?' in url else f"{url}?{query_string}"
+
+    body = json.dumps(data).encode('utf-8') if data is not None else None
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            content = resp.read().decode('utf-8')
+            return json.loads(content) if content else None
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode('utf-8', errors='replace')
+        print(f"[Supabase REST] Error {e.code}: {err_msg}")
+        raise
 
 
 def test_connection() -> Dict[str, Any]:
