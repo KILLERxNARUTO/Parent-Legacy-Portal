@@ -1067,6 +1067,21 @@ const Dashboard = (() => {
 
         <!-- Section 1: Filter Bar & Context Welcome Compact -->
         <div class="bg-surface-container-lowest/90 backdrop-blur-xl rounded-xl p-3.5 shadow-sm border border-secondary-container/40 flex flex-col gap-2.5">
+          <!-- Print-Only Official Report Header -->
+          <div class="print-only-header pb-3 border-b border-secondary-container mb-1 items-center justify-between">
+            <div class="flex items-center gap-3">
+              <img src="/assets/edutainal_maverick_world_logo.png" alt="Edutainal Maverick World" class="h-9 w-auto object-contain">
+              <div>
+                <h2 class="text-sm font-bold text-on-surface uppercase tracking-wide">EDUTAINAL MAVERICK WORLD</h2>
+                <p class="text-[9px] text-secondary font-mono">OFFICIAL STUDENT LEARNING EVIDENCE &amp; PROGRESS REPORT</p>
+              </div>
+            </div>
+            <div class="text-right text-[9px] text-on-surface-variant font-mono">
+              <p>Student: <strong>${esc(student.name)}</strong> (${esc(student.id)})</p>
+              <p>World Tier: <strong>${esc(student.world_tier || 'Genesis').toUpperCase()}</strong> · Date: ${localToday()}</p>
+            </div>
+          </div>
+
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
             <div class="flex flex-col gap-0.5">
               <div class="flex items-center gap-1.5">
@@ -1079,9 +1094,9 @@ const Dashboard = (() => {
               </h1>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <button type="button" id="export-csv" class="btn-interactive inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs transition-all shadow-sm font-semibold">
-                <span class="material-symbols-outlined text-base">download</span>
-                <span>Export CSV</span>
+              <button type="button" id="export-pdf" class="btn-interactive inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container text-xs transition-all shadow-sm font-semibold">
+                <span class="material-symbols-outlined text-base">picture_as_pdf</span>
+                <span>Export PDF</span>
               </button>
             </div>
           </div>
@@ -1337,17 +1352,15 @@ const Dashboard = (() => {
       };
     }
 
-    // CSV Export
-    const csvBtn = byId('export-csv');
-    if (csvBtn) {
-      csvBtn.onclick = () => {
-        const blob = new Blob([PortalAnalytics.csv(source.student, summary.logs, source.skills.map(s => s.name))], {type: 'text/csv;charset=utf-8'});
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${source.student.id}-learning-evidence.csv`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    // PDF Export
+    const pdfBtn = byId('export-pdf') || byId('export-csv');
+    if (pdfBtn) {
+      pdfBtn.onclick = () => {
+        const originalTitle = document.title;
+        const studentName = source.student?.name || 'Student';
+        document.title = `${studentName} - Edutainal Learning Evidence Report - ${localToday()}`;
+        window.print();
+        setTimeout(() => { document.title = originalTitle; }, 1000);
       };
     }
 
@@ -1362,6 +1375,7 @@ const Dashboard = (() => {
   }
 
   function show(report) {
+    if (document.body.dataset.role !== 'parent') return;
     source = report;
     if (state.student !== report.student.id) {
       state.student = report.student.id;
@@ -1373,6 +1387,8 @@ const Dashboard = (() => {
       state.expandedSkill = null;
       state.expandedBehavior = null;
       state.showNextChecklist = false;
+      state.reviewedClasses = new Set();
+      state.checklistChecked = {1: false, 2: false, 3: false};
       state.skill = Math.max(0, report.skills.findIndex(s => s.score !== null));
     }
     render();

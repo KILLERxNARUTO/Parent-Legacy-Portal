@@ -35,7 +35,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(self.client.get('/static/index.html').status_code,404)
         self.assertEqual(self.client.post('/api/v1/auth/login',json={'username':'parent.a','password':PASSWORD,'portal':'company'}).status_code,401)
         login(self.client,'parent.a','parent')
-        self.assertEqual(self.client.get('/company',follow_redirects=False).headers['location'],'/parent')
+        self.assertEqual(self.client.get('/company',follow_redirects=False).headers['location'],'/company/login')
         self.assertNotIn('Company workspace',self.client.get('/parent').text)
 
     def test_parent_scope_on_every_endpoint_and_mutation(self):

@@ -1,11 +1,22 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const observer = document.body.dataset.role === 'observer';
+const portal = observer ? 'company' : 'parent';
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let config, currentReport, requestNumber = 0, pendingSubmission = null, pendingEnrollment = null;
-let csrfToken = '', signedInUser;
+let csrfToken = '', signedInUser, liveConnection, rosterRequestNumber = 0;
 const loginPath = observer ? '/company/login' : '/parent/login';
-function signInAgain() { $('report').replaceChildren(); $('student').replaceChildren(); $('intro').textContent=''; location.replace(loginPath); }
+function clearReport() {
+  currentReport = null;
+  $('report').replaceChildren();
+  $('intro').textContent = '';
+  $('assessment').hidden = true;
+  for (const id of ['sidebar-student-name', 'breadcrumb-student']) {
+    if ($(id)) $(id).textContent = 'Select learner';
+  }
+  if ($('sidebar-student-meta')) $('sidebar-student-meta').textContent = '';
+}
+function signInAgain() { liveConnection?.close(); ++requestNumber; clearReport(); $('student').replaceChildren(); location.replace(loginPath); }
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 function status(message, error = false) { $('status').textContent = message; $('status').className = error ? 'error' : ''; }
 
@@ -31,47 +42,39 @@ async function handleSyncEvent(type, data) {
       await loadReport(true);
     }
   } else if (type === 'student_enrolled') {
-    showLiveToast(`Live Sync: New student ${data.name || ''} enrolled`);
+    if (observer) showLiveToast(`New student ${data.name || ''} enrolled`);
     await loadRoster($('student')?.value);
   } else if (type === 'assignment_updated') {
+    if (observer) await ParentAccounts.load();
     await loadRoster($('student')?.value);
   }
 }
 
 function initLiveSync() {
-  if ('BroadcastChannel' in window) {
-    const liveChannel = new BroadcastChannel('edutainal_live_sync');
-    liveChannel.onmessage = (e) => {
-      const msg = e.data || {};
-      handleSyncEvent(msg.type, msg);
-    };
-  }
+  // Only the authenticated server stream may deliver student updates.
+  // Browser-wide messages would bypass per-parent assignment filtering.
   try {
-    const sse = new EventSource('/api/v1/events');
-    sse.addEventListener('observation_saved', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        handleSyncEvent('observation_saved', data);
-      } catch(err) {}
-    });
-    sse.addEventListener('student_enrolled', (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        handleSyncEvent('student_enrolled', data);
-      } catch(err) {}
-    });
-    sse.addEventListener('assignment_updated', () => {
-      handleSyncEvent('assignment_updated', {});
-    });
-  } catch(err) {}
+    liveConnection?.close();
+    const sse = liveConnection = new EventSource('/api/v1/events?portal=' + portal);
+    for (const type of ['observation_saved', 'student_enrolled', 'assignment_updated']) {
+      sse.addEventListener(type, async event => {
+        try { await handleSyncEvent(type, JSON.parse(event.data)); }
+        catch (error) { status(error.message, true); }
+      });
+    }
+    sse.addEventListener('session_expired', signInAgain);
+    // Reconcile changes missed while the connection was offline.
+    sse.addEventListener('connected', () => loadRoster($('student')?.value).catch(error => status(error.message, true)));
+    sse.onerror = () => api('/auth/me').catch(error => status(error.message, true));
+  } catch(error) { status('Live updates are unavailable. Use Refresh to reload records.', true); }
 }
 
 async function api(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'X-CSRF-Token': csrfToken,
-    'X-Portal': observer ? 'company' : 'parent',
-    ...(options.headers || {})
+    ...(options.headers || {}),
+    'X-Portal': portal
   };
   const response = await fetch('/api/v1' + path, {...options, headers, signal: AbortSignal.timeout(15000)});
   if (response.status === 401) { signInAgain(); throw new Error('Please sign in again.'); }
@@ -83,21 +86,24 @@ async function api(path, options = {}) {
 function render(report) {
   currentReport = report;
   $('intro').textContent = `${report.student.name} · Age ${report.student.age} · ${report.student.world_tier.toUpperCase()} programme`;
-  document.querySelectorAll('nav a').forEach(link => {
-    const url = new URL(link.href);
-    url.searchParams.set('student', report.student.id);
-    link.href = url.pathname + url.search + url.hash;
-  });
-  Dashboard.show(report);
+  for (const id of ['sidebar-student-name', 'breadcrumb-student']) {
+    if ($(id)) $(id).textContent = report.student.name;
+  }
+  if ($('sidebar-student-meta')) $('sidebar-student-meta').textContent = `${report.student.world_tier} programme · Age ${report.student.age}`;
+  if (observer) CompanyDashboard.show(report);
+  else Dashboard.show(report);
 }
 
 async function loadReport(silent = false) {
   const n = ++requestNumber, sid = $('student').value;
   if (!silent) {
-    $('report').innerHTML = '';
-    currentReport = null;
+    clearReport();
   }
-  if (!sid) { $('intro').textContent = ''; $('assessment').hidden = true; $('report').innerHTML = '<div class="empty">No children are assigned to this account yet. Contact the Edutainal team, or enroll and assign a student from the company portal.</div>'; return; }
+  if (!sid) {
+    clearReport();
+    $('report').innerHTML = `<div class="empty">${observer ? 'No students are enrolled yet. Use Enroll learner to add a student.' : 'No children are assigned to your account yet. Contact the Edutainal team for access.'}</div>`;
+    return;
+  }
   if (!silent) status('Loading saved observations…');
   try {
     const report = await api(`/students/${encodeURIComponent(sid)}/analytics`);
@@ -108,11 +114,15 @@ async function loadReport(silent = false) {
       dot.classList.add('pulse');
       setTimeout(() => dot.classList.remove('pulse'), 2500);
     }
-  } catch(e) { if(n === requestNumber) { $('assessment').hidden = true; status(e.message, true); } }
+  } catch(e) { if(n === requestNumber) { clearReport(); status(e.message, true); } }
 }
 
 async function loadRoster(selected) {
+  const rosterRequest = ++rosterRequestNumber;
+  ++requestNumber;
+  clearReport();
   const students = await api('/students');
+  if (rosterRequest !== rosterRequestNumber) return;
   $('student').innerHTML = students.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.name)}</option>`).join('');
   const requested = selected || new URLSearchParams(location.search).get('student');
   if (requested && students.some(s => s.id === requested)) $('student').value = requested;
@@ -137,11 +147,6 @@ function observerForms() {
     try {
       const s = await api('/students',{method:'POST',body:JSON.stringify(values)});
       pendingEnrollment=null; e.target.reset();
-      if ('BroadcastChannel' in window) {
-        const liveChannel = new BroadcastChannel('edutainal_live_sync');
-        liveChannel.postMessage({type: 'student_enrolled', student_id: s.id, name: s.name});
-        liveChannel.close();
-      }
       await loadRoster(s.id); await ParentAccounts.load(); status('Student enrolled. No scores assigned until observed.');
     } catch(e) { status(e.message + ' If this follows a connection failure, refresh the roster before enrolling again.',true); } finally {button.disabled=false;}
   });
@@ -162,17 +167,6 @@ function observerForms() {
     try {
       await api('/sessions', {method:'POST',body:JSON.stringify(payload)});
       form.reset();
-      if ('BroadcastChannel' in window) {
-        const liveChannel = new BroadcastChannel('edutainal_live_sync');
-        liveChannel.postMessage({
-          type: 'observation_saved',
-          student_id: payload.student_id,
-          zone_name: payload.zone_name,
-          project_title: payload.project_title,
-          observer_name: signedInUser?.name || 'Observer'
-        });
-        liveChannel.close();
-      }
       await loadReport();
       $('save-status').textContent = 'Observation saved and synced in real-time across open portals.';
     } catch(e) { $('save-status').textContent = 'Save not confirmed: ' + e.message + '. Your form is retained. Retry with unchanged values to avoid duplicates.'; }
@@ -212,7 +206,7 @@ if ('BroadcastChannel' in window) {
   const channel=new BroadcastChannel('portal-auth');
   channel.onmessage=(e)=>{
     const p = e.data && e.data.portal;
-    if (!p || p === (observer ? 'company' : 'parent')) {
+    if (p === portal) {
       $('report').replaceChildren();
       location.reload();
     }
@@ -229,7 +223,7 @@ async function init() {
   try {
     signedInUser = await api('/auth/me');
     const expected = observer ? 'observer' : 'parent';
-    if (signedInUser.role !== expected) { location.replace(signedInUser.role === 'observer' ? '/company' : '/parent'); return; }
+    if (signedInUser.role !== expected) { signInAgain(); return; }
     csrfToken = signedInUser.csrf_token;
     $('signed-in-name').textContent = signedInUser.name;
     config = await api('/config');

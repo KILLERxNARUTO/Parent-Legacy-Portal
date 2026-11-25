@@ -1,6 +1,9 @@
 import tempfile
 import unittest
+import asyncio
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 from backend import main, auth, accounts
 from auth_support import PASSWORD
@@ -119,7 +122,116 @@ class DualPortalSyncTests(unittest.TestCase):
 
             self.assertFalse(q.empty())
             msg = q.get_nowait()
-            self.assertIn('event: observation_saved', msg)
-            self.assertIn('demo-aarav', msg)
+            self.assertEqual(msg['type'], 'observation_saved')
+            self.assertEqual(msg['data']['student_id'], 'demo-aarav')
         finally:
             main.broadcaster.unsubscribe(q)
+
+    def sign_in(self, portal):
+        username = 'company.admin' if portal == 'company' else 'parent.aarav'
+        result = self.client.post('/api/v1/auth/login', json={
+            'username': username, 'password': 'DemoPassword123!', 'portal': portal,
+        })
+        self.assertEqual(result.status_code, 200)
+        return self.client.get('/api/v1/auth/me', headers={'X-Portal': portal}).json()
+
+    def test_parent_request_never_borrows_company_session(self):
+        actor = self.sign_in('company')
+        headers = {'X-Portal': 'parent', 'X-CSRF-Token': actor['csrf_token']}
+        for path in ['/auth/me', '/students', '/students/demo-aarav/analytics', '/parents']:
+            self.assertEqual(self.client.get('/api/v1' + path, headers=headers).status_code, 401)
+        self.assertEqual(self.client.post('/api/v1/students', headers=headers,
+                                         json={'name': 'Unscoped child', 'age': 10}).status_code, 401)
+        self.assertEqual(self.client.get('/parent', follow_redirects=False).headers['location'], '/parent/login')
+        self.assertEqual(self.client.get('/api/v1/students', headers={'X-Portal': 'invalid'}).status_code, 400)
+
+    def test_company_request_never_borrows_parent_session(self):
+        self.sign_in('parent')
+        self.assertEqual(self.client.get('/api/v1/auth/me', headers={'X-Portal': 'company'}).status_code, 401)
+        self.assertEqual(self.client.get('/company', follow_redirects=False).headers['location'], '/company/login')
+
+    def test_both_login_orders_keep_data_and_renderers_separate(self):
+        for order in [('parent', 'company'), ('company', 'parent')]:
+            with self.subTest(order=order):
+                self.client.cookies.clear()
+                for portal in order:
+                    self.sign_in(portal)
+                parent_headers, company_headers = {'X-Portal': 'parent'}, {'X-Portal': 'company'}
+                parent = self.client.get('/api/v1/auth/me', headers=parent_headers).json()
+                roster = self.client.get('/api/v1/students', headers=parent_headers).json()
+                self.assertEqual({student['id'] for student in roster}, set(parent['students']))
+                self.assertEqual(self.client.get('/api/v1/parents', headers=parent_headers).status_code, 403)
+                self.assertEqual(self.client.get('/api/v1/parents', headers=company_headers).status_code, 200)
+                parent_html = self.client.get('/parent').text
+                company_html = self.client.get('/company').text
+                self.assertIn('/static/dashboard.js', parent_html)
+                self.assertNotIn('/static/company-dashboard.js', parent_html)
+                self.assertNotIn('id="parent-accounts"', parent_html)
+                self.assertIn('/static/company-dashboard.js', company_html)
+                self.assertNotIn('/static/dashboard.js', company_html)
+
+    def test_expired_portal_does_not_fall_back_to_other_session(self):
+        self.sign_in('parent')
+        self.sign_in('company')
+        with main.database() as db:
+            db.execute('UPDATE auth_sessions SET expires_at=0 WHERE token_hash=?',
+                       (auth.token_hash(self.client.cookies.get(main.PARENT_SESSION_COOKIE)),))
+        self.assertEqual(self.client.get('/api/v1/students', headers={'X-Portal': 'parent'}).status_code, 401)
+        self.assertEqual(self.client.get('/api/v1/students', headers={'X-Portal': 'company'}).status_code, 200)
+
+    def test_logout_only_ends_selected_portal(self):
+        for portal, other in [('parent', 'company'), ('company', 'parent')]:
+            with self.subTest(portal=portal):
+                actors = {name: self.sign_in(name) for name in ('parent', 'company')}
+                response = self.client.post('/api/v1/auth/logout', json={}, headers={
+                    'X-Portal': portal, 'X-CSRF-Token': actors[portal]['csrf_token'],
+                })
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.client.get('/api/v1/auth/me', headers={'X-Portal': portal}).status_code, 401)
+                self.assertEqual(self.client.get('/api/v1/auth/me', headers={'X-Portal': other}).status_code, 200)
+
+    def test_live_stream_requires_matching_portal_login(self):
+        self.assertEqual(self.client.get('/api/v1/events?portal=parent').status_code, 401)
+        self.sign_in('company')
+        self.assertEqual(self.client.get('/api/v1/events?portal=parent').status_code, 401)
+        self.assertEqual(self.client.get('/api/v1/events').status_code, 400)
+
+    def test_live_stream_filters_updates_and_rechecks_access(self):
+        actor = self.sign_in('parent')
+        request = SimpleNamespace(
+            headers={'X-Portal': 'parent'}, cookies=dict(self.client.cookies),
+            url=SimpleNamespace(path='/api/v1/events'), query_params={}, method='GET',
+            is_disconnected=AsyncMock(return_value=False),
+        )
+
+        async def check_stream():
+            response = await main.realtime_events(request, actor)
+            stream = response.body_iterator
+            try:
+                self.assertIn('event: connected', await anext(stream))
+                main.broadcaster.broadcast('student_enrolled', {'student_id': 'another-child', 'name': 'Private child'})
+                main.broadcaster.broadcast('assignment_updated', {'parent_id': 'another-parent', 'students': ['another-child']})
+                main.broadcaster.broadcast('observation_saved', {'student_id': 'demo-aarav', 'project_title': 'Assigned child evidence'})
+                update = await asyncio.wait_for(anext(stream), timeout=1)
+                self.assertIn('Assigned child evidence', update)
+                self.assertNotIn('Private child', update)
+
+                # A queued observation must be filtered using the latest access,
+                # not the permissions captured when the stream opened.
+                main.broadcaster.broadcast('observation_saved', {'student_id': 'demo-aarav', 'project_title': 'Revoked evidence'})
+                with main.database() as db:
+                    db.execute('DELETE FROM parent_children WHERE user_id=?', (actor['id'],))
+                main.broadcaster.broadcast('assignment_updated', {'parent_id': actor['id'], 'students': []})
+                update = await asyncio.wait_for(anext(stream), timeout=1)
+                self.assertIn('assignment_updated', update)
+                self.assertNotIn('Revoked evidence', update)
+
+                with main.database() as db:
+                    db.execute('DELETE FROM auth_sessions WHERE user_id=?', (actor['id'],))
+                main.broadcaster.broadcast('observation_saved', {'student_id': 'demo-aarav'})
+                self.assertIn('session_expired', await asyncio.wait_for(anext(stream), timeout=1))
+            finally:
+                await stream.aclose()
+            self.assertEqual(len(main.broadcaster._subscribers), 0)
+
+        asyncio.run(check_stream())

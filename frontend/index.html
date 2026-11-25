@@ -213,6 +213,7 @@
     }
   </style>
 
+  <link rel="stylesheet" href="/static/portal-shell.css">
   <!-- Application Logic -->
   <script defer src="/static/analytics.js"></script>
   <script defer src="/static/progress.js"></script>
@@ -222,7 +223,7 @@
 <body class="session-loading bg-surface text-on-surface font-body-default min-h-screen text-[13px]" data-role="parent">
 
   <!-- Fixed Left Sidebar (Stitch Design Compact) -->
-  <aside class="fixed left-3 top-3 bottom-3 w-[204px] bg-dark-petrol text-surface-container-lowest z-50 flex flex-col justify-between p-3 rounded-2xl shadow-[0_12px_38px_rgba(21,52,59,0.22)]">
+  <aside class="portal-sidebar fixed left-3 top-3 bottom-3 w-[204px] bg-dark-petrol text-surface-container-lowest z-50 flex flex-col justify-between p-3 rounded-2xl shadow-[0_12px_38px_rgba(21,52,59,0.22)]">
     <div class="flex flex-col gap-3">
       <!-- Brand Logo Header -->
       <div class="flex items-center gap-2.5 px-1 py-1">
@@ -282,10 +283,10 @@
       </div>
 
       <div class="flex flex-col gap-0.5">
-        <a href="/company" target="_blank" class="flex items-center justify-between px-2 py-1 rounded text-surface-variant hover:bg-company-dark/40 hover:text-surface-container-lowest transition-colors font-body-sm text-[11px]">
+        <a href="/company/login" target="_blank" rel="noopener" class="flex items-center justify-between px-2 py-1 rounded text-surface-variant hover:bg-company-dark/40 hover:text-surface-container-lowest transition-colors font-body-sm text-[11px]">
           <span class="flex items-center gap-1.5">
             <span class="material-symbols-outlined text-sm text-gold-accent">swap_horiz</span>
-            Observer View
+            Company sign-in
           </span>
           <span class="material-symbols-outlined text-xs">open_in_new</span>
         </a>
@@ -298,9 +299,9 @@
   </aside>
 
   <!-- App Shell -->
-  <div class="pl-[220px] pr-3">
+  <div class="portal-shell pl-[220px] pr-3">
     <!-- Floating Glass Topbar (Stitch Design Compact) -->
-    <header class="fixed top-3 left-[220px] right-3 h-12 z-40 bg-surface-container-lowest/85 backdrop-blur-xl rounded-xl shadow-[0_8px_24px_rgba(32,79,95,0.06)] flex items-center justify-between px-4 border border-white/70">
+    <header class="portal-topbar fixed top-3 left-[220px] right-3 h-12 z-40 bg-surface-container-lowest/85 backdrop-blur-xl rounded-xl shadow-[0_8px_24px_rgba(32,79,95,0.06)] flex items-center justify-between px-4 border border-white/70">
       <div class="flex items-center gap-2.5">
         <nav class="flex items-center gap-1.5 font-label-default text-xs text-on-surface-variant">
           <span class="text-on-surface-variant">Parent Console</span>
@@ -353,7 +354,7 @@
     </header>
 
     <!-- Main Content Canvas -->
-    <main class="relative w-full pt-14 bg-surface pb-8">
+    <main class="portal-main relative w-full pt-14 bg-surface pb-8">
       <div id="mode-note" class="sr-only"></div>
       <p id="status" role="status" aria-live="polite" class="text-xs text-on-surface-variant px-6 py-1"></p>
 

@@ -44,6 +44,11 @@ Both portals now use **Email / Login ID and Password** protected by cryptographi
 3. **Simultaneous Dual Sessions**:
    - The portals use separate session cookies (`edutainal_parent_session` and `edutainal_company_session`).
    - You can open both portals side-by-side in separate tabs or windows without session conflicts.
+   - Signing out of one portal leaves the other portal signed in. A missing or expired session returns to that portal's own login.
+   - API requests identify their portal with `X-Portal: parent` or `X-Portal: company`. A scoped request never falls back to the other portal's session.
+   - Live updates use `/api/v1/events?portal=parent` or `?portal=company`, require a matching session, and recheck current child assignments before sending events.
+
+The parent console loads `dashboard.js` for assigned-child learning reports. The company workspace loads `company-dashboard.js` for saved student records, alongside staff-only enrollment, assessment and parent-access management. The two views share saved observations; company controls and account data are not rendered in the parent console.
 
 ---
 
@@ -65,4 +70,5 @@ python -m unittest discover -s tests -v
 
 # JavaScript analytics tests (6 tests)
 node --test tests/test_analytics.cjs
+node --test tests/test_portal_views.cjs
 ```

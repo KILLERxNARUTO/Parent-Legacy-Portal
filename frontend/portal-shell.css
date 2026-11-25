@@ -1,0 +1,70 @@
+/* Shell sizing is shared, but each portal owns its content and report renderer. */
+[hidden] { display: none !important; }
+body .portal-sidebar { overflow-y: auto; }
+body .portal-topbar {
+  position: sticky;
+  top: 12px;
+  left: auto;
+  right: auto;
+  height: auto;
+  min-height: 64px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.portal-topbar > div { min-width: 0; max-width: 100%; flex-wrap: wrap; gap: 12px; }
+.portal-topbar nav { flex-wrap: wrap; }
+body[data-role="parent"] .portal-topbar { margin-top: 12px; }
+body[data-role="parent"] .portal-main { padding-top: 16px; }
+body[data-role="observer"] .portal-topbar { margin: 16px 16px 0 272px; }
+body[data-role="observer"] .portal-main { padding-top: 24px; }
+.portal-main { min-width: 0; }
+.portal-main .empty { padding: 24px; background: white; border: 1px solid #dce3e2; border-radius: 12px; font-size: 14px; }
+#status.error { color: #a92323; }
+#status:empty { display: none; }
+@media (max-width: 1100px) {
+  body .portal-sidebar { position: relative; inset: auto; width: auto; margin: 12px; gap: 20px; }
+  .portal-sidebar nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .portal-sidebar nav > a, .portal-sidebar nav > button { width: auto; flex: 1 1 160px; min-height: 40px; }
+  body .portal-shell { padding-left: 12px; padding-right: 12px; }
+  body[data-role="observer"] .portal-topbar { margin: 12px; }
+  body[data-role="observer"] .portal-main { padding: 16px 12px 32px; }
+  body .portal-topbar { position: relative; top: auto; }
+  body[data-role="observer"] #enrollment,
+  body[data-role="observer"] #assessment,
+  body[data-role="observer"] #parent-accounts,
+  body[data-role="observer"] #report { scroll-margin-top: 16px; }
+}
+.print-only-header { display: none; }
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #001f25 !important;
+    font-size: 11pt !important;
+  }
+  .print-only-header { display: flex !important; }
+  .portal-sidebar, .portal-topbar, dialog, #dashboard-tooltip, #export-pdf, #export-csv, #clear-filters, .btn-interactive, #account-dialog, #refresh {
+    display: none !important;
+  }
+  .portal-shell, body[data-role] .portal-main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .card, .panel, .project-detail {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+    border: 1px solid #d0dee1 !important;
+    background: #ffffff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -268,11 +268,10 @@
     }
   </style>
 
-  <!-- Core Dashboard & Portal Scripts -->
-  <script defer src="/static/motion.js?v=glass-1"></script>
-  <script defer src="/static/analytics.js?v=class-progress-1"></script>
-  <script defer src="/static/progress.js?v=class-progress-1"></script>
-  <script defer src="/static/dashboard.js?v=class-progress-1"></script>
+  <!-- Company-only records view; parent analytics are loaded by /parent. -->
+  <link rel="stylesheet" href="/static/company-workspace.css">
+  <link rel="stylesheet" href="/static/portal-shell.css">
+  <script defer src="/static/company-dashboard.js"></script>
   <script defer src="/static/accounts.js?v=auth-1"></script>
   <script defer src="/static/portal.js?v=auth-1"></script>
 </head>
@@ -280,7 +279,7 @@
 <body class="session-loading bg-surface text-on-surface font-body-default min-h-screen antialiased selection:bg-primary-container selection:text-on-primary-container" data-role="observer">
 
   <!-- A. Fixed Left Sidebar (Stitch Design Specification) -->
-  <aside class="fixed left-4 top-4 bottom-4 w-60 bg-dark-petrol text-surface-container-lowest rounded-[24px] shadow-[0_12px_38px_rgba(21,52,59,0.22)] p-4 flex flex-col justify-between z-50 transition-all duration-300">
+  <aside class="portal-sidebar fixed left-4 top-4 bottom-4 w-60 bg-dark-petrol text-surface-container-lowest rounded-[24px] shadow-[0_12px_38px_rgba(21,52,59,0.22)] p-4 flex flex-col justify-between z-50 transition-all duration-300">
     <div class="flex flex-col gap-6">
       <!-- Brand Logo Header -->
       <a href="/company" class="flex items-center gap-3 px-2 py-1 group">
@@ -301,7 +300,7 @@
 
       <!-- Navigation Links -->
       <nav class="flex flex-col gap-1.5" aria-label="Company portal navigation">
-        <a href="/company" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/15 text-white font-headline-md text-sm font-semibold transition-colors duration-150 shadow-sm" aria-current="page">
+        <a href="#report" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/15 text-white font-headline-md text-sm font-semibold transition-colors duration-150 shadow-sm" aria-current="page">
           <span class="material-symbols-outlined text-[20px] text-[#a1f1e6]">analytics</span>
           <span>Student Records</span>
         </a>
@@ -333,10 +332,10 @@
 
     <!-- Mentor Footer Profile & Quick Switch -->
     <div class="pt-3 border-t border-white/10 flex flex-col gap-2">
-      <a href="/parent" target="_blank" class="flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-[#a1f1e6] font-medium transition-colors">
+      <a href="/parent/login" target="_blank" rel="noopener" class="flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-[#a1f1e6] font-medium transition-colors">
         <span class="flex items-center gap-2">
           <span class="material-symbols-outlined text-[16px]">visibility</span>
-          <span>Preview Parent View</span>
+          <span>Open parent sign-in</span>
         </span>
         <span class="material-symbols-outlined text-[14px]">open_in_new</span>
       </a>
@@ -354,7 +353,7 @@
   </aside>
 
   <!-- B. Floating Top Navigation Bar -->
-  <header class="fixed top-4 left-[272px] right-4 h-16 bg-surface-container-lowest/85 backdrop-blur-xl rounded-[20px] shadow-[0_12px_38px_rgba(32,79,95,0.07)] border border-secondary-container/40 flex items-center justify-between px-6 z-40">
+  <header class="portal-topbar fixed top-4 left-[272px] right-4 h-16 bg-surface-container-lowest/85 backdrop-blur-xl rounded-[20px] shadow-[0_12px_38px_rgba(32,79,95,0.07)] border border-secondary-container/40 flex items-center justify-between px-6 z-40">
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2 text-xs font-eyebrow text-on-surface-variant">
         <span class="text-primary font-bold">COMPANY PORTAL</span>
@@ -410,7 +409,7 @@
   </header>
 
   <!-- C. Main Application Scroll Surface -->
-  <main id="main" class="pl-[272px] pr-4 pt-24 pb-12 min-h-screen bg-surface">
+  <main id="main" class="portal-main pl-[272px] pr-4 pt-24 pb-12 min-h-screen bg-surface">
     <div class="max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-6">
 
       <!-- Status & Notice Banner -->
@@ -441,7 +440,7 @@
       <!-- Parent Accounts Management Section (Dynamic Injection by accounts.js) -->
       <section id="parent-accounts" hidden></section>
 
-      <!-- Stitch Dashboard Container (Rendered dynamically by dashboard.js) -->
+      <!-- Company student records (company-dashboard.js) -->
       <div id="report"></div>
 
       <!-- Footer -->

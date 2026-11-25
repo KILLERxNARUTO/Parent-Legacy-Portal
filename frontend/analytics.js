@@ -36,7 +36,7 @@ const PortalAnalytics = (() => {
       const weight = samples.reduce((s, x) => s + x.weight, 0);
       const score = weight ? round(samples.reduce((s, x) => s + x.value * x.weight, 0) / weight) : null;
       const mean = array => array.reduce((s, x) => s + x.value, 0) / array.length;
-      return {name: skill.name, score, observations: samples.length,
+      return {name: skill.name, index: i, score, observations: samples.length,
         trend: samples.length >= 6 ? round(mean(samples.slice(-3)) - mean(samples.slice(-6, -3))) : null,
         last_observed: samples.at(-1)?.date || null};
     });

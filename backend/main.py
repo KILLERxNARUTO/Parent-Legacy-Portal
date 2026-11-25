@@ -64,23 +64,39 @@ PATHWAYS = [
 class RealtimeBroadcaster:
     """Manages real-time Server-Sent Events subscribers and synchronous queue dispatch."""
     def __init__(self):
-        self._subscribers: set[asyncio.Queue] = set()
+        self._subscribers: dict[asyncio.Queue, asyncio.AbstractEventLoop | None] = {}
 
     def subscribe(self) -> asyncio.Queue:
         q = asyncio.Queue(maxsize=100)
-        self._subscribers.add(q)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        self._subscribers[q] = loop
         return q
 
     def unsubscribe(self, q: asyncio.Queue):
-        self._subscribers.discard(q)
+        self._subscribers.pop(q, None)
 
     def broadcast(self, event_type: str, data: dict):
-        payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
-        for q in list(self._subscribers):
-            try:
+        payload = {'type': event_type, 'data': data}
+        def deliver(q):
+            if q not in self._subscribers:
+                return
+            if q.full():
+                q.get_nowait()
+                q.put_nowait({'type': 'resync', 'data': {}})
+            else:
                 q.put_nowait(payload)
-            except Exception:
-                self._subscribers.discard(q)
+
+        for q, loop in list(self._subscribers.items()):
+            try:
+                if loop is not None:
+                    loop.call_soon_threadsafe(deliver, q)
+                else:
+                    deliver(q)
+            except RuntimeError:
+                self.unsubscribe(q)
 
 
 broadcaster = RealtimeBroadcaster()
@@ -157,25 +173,29 @@ async def protect_browser_requests(request: Request, call_next):
 
 def identity(request: Request):
     portal_hint = request.headers.get('X-Portal')
+    if request.url.path == '/api/v1/events':
+        portal_hint = portal_hint or request.query_params.get('portal')
+        if not portal_hint:
+            raise HTTPException(400, 'Select a portal for live updates')
+    if portal_hint is not None and portal_hint not in ('parent', 'company'):
+        raise HTTPException(400, 'Unknown portal')
     with database() as db:
-        token = None
-        if portal_hint == 'company':
-            token = request.cookies.get(COMPANY_SESSION_COOKIE)
-        elif portal_hint == 'parent':
-            token = request.cookies.get(PARENT_SESSION_COOKIE)
-        if not token:
+        if portal_hint:
+            cookie = COMPANY_SESSION_COOKIE if portal_hint == 'company' else PARENT_SESSION_COOKIE
+            token = request.cookies.get(cookie)
+        else:
+            # Legacy clients use their last login. Explicit portal requests never
+            # borrow another portal's session, even when both cookies are present.
             token = request.cookies.get(auth.SESSION_COOKIE)
-        if not token:
-            token = request.cookies.get(COMPANY_SESSION_COOKIE) or request.cookies.get(PARENT_SESSION_COOKIE)
+            if not token:
+                tokens = [request.cookies.get(c) for c in (COMPANY_SESSION_COOKIE, PARENT_SESSION_COOKIE)]
+                tokens = [t for t in tokens if t]
+                token = tokens[0] if len(tokens) == 1 else None
         actor = auth.actor_for_token(db, token)
         if portal_hint and actor:
             expected_role = 'observer' if portal_hint == 'company' else 'parent'
             if actor['role'] != expected_role:
-                specific = request.cookies.get(COMPANY_SESSION_COOKIE if portal_hint == 'company' else PARENT_SESSION_COOKIE)
-                if specific:
-                    alt_actor = auth.actor_for_token(db, specific)
-                    if alt_actor and alt_actor['role'] == expected_role:
-                        actor = alt_actor
+                actor = None
     if not actor:
         raise HTTPException(401, 'Please sign in to continue')
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
@@ -318,54 +338,24 @@ class GoogleAuthPayload(BaseModel):
 
 @app.post('/api/v1/auth/google')
 def google_auth(payload: GoogleAuthPayload, response: Response):
-    """
-    Authenticate a parent via Google Identity Services.
-    - When GOOGLE_CLIENT_ID is set: requires a real Google JWT `credential` token.
-      Plain {email, name} payloads are rejected in that mode.
-    - When GOOGLE_CLIENT_ID is NOT set (dev/no-config): accepts {email, name}
-      directly for developer convenience. This mode is never reached in production
-      when PORTAL_MODE=production or GOOGLE_CLIENT_ID is configured.
-    """
+    """Accept only Google-verified email identities for the configured client."""
     client_id = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
-    email = None
-    name = None
-
-    if payload.credential:
-        if client_id:
-            # Real Google JWT verification path (production)
-            try:
-                from google.oauth2 import id_token
-                from google.auth.transport import requests as google_requests
-                idinfo = id_token.verify_oauth2_token(payload.credential, google_requests.Request(), client_id)
-                email = idinfo.get('email', '').strip().lower()
-                name = idinfo.get('name', email.split('@')[0])
-                if not idinfo.get('email_verified'):
-                    raise HTTPException(401, 'Google account email is not verified')
-            except HTTPException:
-                raise
-            except Exception as ex:
-                raise HTTPException(401, f'Invalid Google credential: {ex}')
-        else:
-            # Dev fallback: decode JWT claims without signature verification
-            try:
-                import base64
-                parts = payload.credential.split('.')
-                if len(parts) >= 2:
-                    padded = parts[1] + '=' * (4 - len(parts[1]) % 4)
-                    claims = json.loads(base64.urlsafe_b64decode(padded))
-                    email = claims.get('email', '').strip().lower()
-                    name = claims.get('name', email.split('@')[0])
-            except Exception as ex:
-                raise HTTPException(401, f'Invalid Google credential: {ex}')
-    elif payload.email:
-        if client_id or os.environ.get('PORTAL_MODE') == 'production':
-            # In production or when Google auth is configured, reject plain email bypass
-            raise HTTPException(401, 'A valid Google credential token is required. Please sign in with Google.')
-        # Dev-only convenience: accept plain email when no GOOGLE_CLIENT_ID is configured
-        email = payload.email.strip().lower()
-        name = payload.name or email.split('@')[0]
-    else:
-        raise HTTPException(400, 'Google credential or verified email is required')
+    if not client_id:
+        raise HTTPException(503, 'Google sign-in is not configured. Use your assigned username and password.')
+    if not payload.credential:
+        raise HTTPException(401, 'A verified Google credential is required')
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+        idinfo = id_token.verify_oauth2_token(payload.credential, google_requests.Request(), client_id)
+        email = idinfo.get('email', '').strip().lower()
+        name = idinfo.get('name', email.split('@')[0])
+        if idinfo.get('email_verified') is not True:
+            raise HTTPException(401, 'Google account email is not verified')
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(401, 'Invalid Google credential')
 
     if not email:
         raise HTTPException(400, 'Unable to identify Google account email')
@@ -373,8 +363,8 @@ def google_auth(payload: GoogleAuthPayload, response: Response):
     with database() as db:
         if os.environ.get('PORTAL_MODE') != 'production':
             ensure_demo_accounts(db)
-        user = db.execute("SELECT id, username, name, role, active FROM users WHERE (username=? OR username=?) AND role='parent'",
-                          (email, email.split('@')[0])).fetchone()
+        user = db.execute("SELECT id, username, name, role, active FROM users WHERE username=? AND role='parent'",
+                          (email,)).fetchone()
 
         if not user:
             # Auto-provision parent account for verified Google users
@@ -383,11 +373,7 @@ def google_auth(payload: GoogleAuthPayload, response: Response):
             display_name = name or email.split('@')[0].capitalize()
             db.execute("INSERT INTO users (id, username, name, password_hash, role) VALUES (?, ?, ?, ?, 'parent')",
                        (user_id, email, display_name, dummy_hash))
-            # In dev mode, link to sample students
-            if os.environ.get('PORTAL_MODE') != 'production':
-                for sid in ['demo-aarav', 'demo-ananya']:
-                    if db.execute('SELECT 1 FROM students WHERE id=?', (sid,)).fetchone():
-                        db.execute('INSERT OR IGNORE INTO parent_children VALUES (?, ?)', (user_id, sid))
+            # A verified identity still requires an explicit child assignment.
             user = {'id': user_id, 'username': email, 'name': display_name, 'role': 'parent', 'active': 1}
 
         if not user['active']:
@@ -434,10 +420,8 @@ def login(payload: Login, request: Request, response: Response):
         if count >= 5 or address_count >= 30:
             raise HTTPException(429, 'Too many sign-in attempts. Try again in 15 minutes.')
         user = db.execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
-        if not user and '@' in username:
-            user = db.execute('SELECT * FROM users WHERE username=?', (username.split('@')[0],)).fetchone()
-        elif not user:
-            user = db.execute("SELECT * FROM users WHERE username LIKE ?", (username + '@%',)).fetchone()
+        if not user and os.environ.get('PORTAL_MODE') != 'production' and username == 'parent.aarav@gmail.com':
+            user = db.execute('SELECT * FROM users WHERE username=?', ('parent.aarav',)).fetchone()
         valid = auth.verify_password(payload.password, user['password_hash'] if user else auth.DUMMY_PASSWORD)
         if not valid or not user or not user['active'] or user['role'] != expected_role:
             db.execute('INSERT INTO login_attempts VALUES (?,?,?)', (username, address, time.time()))
@@ -466,27 +450,36 @@ def me(actor=Depends(identity)):
 
 @app.post('/api/v1/auth/logout')
 def logout(request: Request, response: Response, actor=Depends(identity)):
+    cookies = [COMPANY_SESSION_COOKIE if actor['role'] == 'observer' else PARENT_SESSION_COOKIE]
     with database() as db:
-        for c in [auth.SESSION_COOKIE, COMPANY_SESSION_COOKIE, PARENT_SESSION_COOKIE]:
+        legacy_actor = auth.actor_for_token(db, request.cookies.get(auth.SESSION_COOKIE))
+        if legacy_actor and legacy_actor['id'] == actor['id']:
+            cookies.append(auth.SESSION_COOKIE)
+        for c in cookies:
             t = request.cookies.get(c)
             if t:
                 db.execute('DELETE FROM auth_sessions WHERE token_hash=?', (auth.token_hash(t),))
-    for c in [auth.SESSION_COOKIE, COMPANY_SESSION_COOKIE, PARENT_SESSION_COOKIE]:
+    for c in cookies:
         response.delete_cookie(c, path='/', secure=SECURE_COOKIES, httponly=True, samesite='strict')
     return {'status': 'signed_out'}
 
 
 @app.post('/api/v1/auth/password')
-def change_password(payload: PasswordChange, response: Response, actor=Depends(identity)):
+def change_password(payload: PasswordChange, request: Request, response: Response, actor=Depends(identity)):
+    cookies = [COMPANY_SESSION_COOKIE if actor['role'] == 'observer' else PARENT_SESSION_COOKIE]
     with database() as db:
         user = db.execute('SELECT password_hash FROM users WHERE id=?', (actor['id'],)).fetchone()
         if not auth.verify_password(payload.current_password, user['password_hash']):
             raise HTTPException(400, 'Current password is incorrect')
         new_hash = auth.hash_password(payload.new_password)
+        legacy_actor = auth.actor_for_token(db, request.cookies.get(auth.SESSION_COOKIE))
+        if legacy_actor and legacy_actor['id'] == actor['id']:
+            cookies.append(auth.SESSION_COOKIE)
         db.execute('UPDATE users SET password_hash=? WHERE id=?', (new_hash, actor['id']))
         db.execute('DELETE FROM auth_sessions WHERE user_id=?', (actor['id'],))
     supabase_client.sync_password(actor['id'], new_hash)
-    response.delete_cookie(auth.SESSION_COOKIE, path='/', secure=SECURE_COOKIES, httponly=True, samesite='strict')
+    for cookie in cookies:
+        response.delete_cookie(cookie, path='/', secure=SECURE_COOKIES, httponly=True, samesite='strict')
     return {'status': 'password_changed'}
 
 
@@ -652,27 +645,25 @@ def company_login():
 def protected_page(request: Request, role: str, filename: str):
     portal = 'company' if role == 'observer' else 'parent'
     specific_cookie = COMPANY_SESSION_COOKIE if role == 'observer' else PARENT_SESSION_COOKIE
-    other_cookie = PARENT_SESSION_COOKIE if role == 'observer' else COMPANY_SESSION_COOKIE
     with database() as db:
         token = request.cookies.get(specific_cookie)
         actor = auth.actor_for_token(db, token) if token else None
         if not actor or actor['role'] != role:
-            fallback = request.cookies.get(auth.SESSION_COOKIE)
-            if fallback:
-                f_actor = auth.actor_for_token(db, fallback)
-                if f_actor and f_actor['role'] == role:
-                    actor = f_actor
-        if not actor or actor['role'] != role:
-            other_token = request.cookies.get(other_cookie) or request.cookies.get(auth.SESSION_COOKIE)
-            other_actor = auth.actor_for_token(db, other_token) if other_token else None
-            if other_actor and other_actor['role'] != role:
-                return RedirectResponse('/company' if other_actor['role'] == 'observer' else '/parent', status_code=303)
             return RedirectResponse(f'/{portal}/login', status_code=303)
     return FileResponse(ROOT / 'frontend' / filename)
 
 
+def visible_event(actor, event):
+    """Authorize each update against current assignments, including revocations."""
+    if event['type'] == 'resync' or actor['role'] == 'observer':
+        return True
+    if event['type'] == 'assignment_updated':
+        return event['data'].get('parent_id') == actor['id']
+    return event['data'].get('student_id') in actor['students']
+
+
 @app.get('/api/v1/events', include_in_schema=False)
-async def realtime_events(request: Request):
+async def realtime_events(request: Request, actor=Depends(identity)):
     q = broadcaster.subscribe()
     async def event_stream():
         try:
@@ -682,9 +673,19 @@ async def realtime_events(request: Request):
                     break
                 try:
                     msg = await asyncio.wait_for(q.get(), timeout=15.0)
-                    yield msg
                 except asyncio.TimeoutError:
+                    msg = None
+                try:
+                    current_actor = identity(request)
+                except HTTPException:
+                    yield 'event: session_expired\ndata: {}\n\n'
+                    break
+                if current_actor['id'] != actor['id']:
+                    break
+                if msg is None:
                     yield ": ping\n\n"
+                elif visible_event(current_actor, msg):
+                    yield f"event: {msg['type']}\ndata: {json.dumps(msg['data'])}\n\n"
         finally:
             broadcaster.unsubscribe(q)
 
